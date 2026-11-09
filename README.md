@@ -1,10 +1,18 @@
 # IU Arabic Courses Assistant — prototype
 Python 3.10+ / Flask. Run:
     pip install -r requirements.txt
-    export ANTHROPIC_API_KEY=...        # without it the AI replies in demo mode
+    export COMETAPI_KEY=...             # without it the AI replies in demo mode
     export GOOGLE_CLIENT_ID=...         # optional; without it a demo login is shown
     python app.py                       # http://127.0.0.1:5000
-Files: models.py (class diagram classes), services.py (AuthService, AIService, LLMService), app.py (web routes), static/index.html (UI).
+Files: models.py (class diagram classes), services.py (AuthService, AIService, LLMService), app.py (web routes),
+static/index.html (UI + SpeechService). MAPPING.md shows where every class and use case is in the code.
+
+## Features
+Student: summary, translation, AI tutor (reply to an answer, ask by voice, listen to answers), quizzes,
+take a published exam (exam mode locks the other features and counts leaving the page).
+Instructor: generate exam questions in English or Arabic, edit questions and options, add own questions
+(checked against the file), print or copy the exam (with or without answer key), publish with a code,
+see results with the most-missed questions and how many times each student left the page.
 
 ## Deploy on Render (no cmd needed)
 1. Push this folder to a GitHub repo (render.yaml must be at the repo root).
