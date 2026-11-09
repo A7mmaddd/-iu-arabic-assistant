@@ -1,0 +1,7 @@
+flask
+cryptography
+anthropic
+pypdf
+python-pptx
+google-auth
+gunicorn
