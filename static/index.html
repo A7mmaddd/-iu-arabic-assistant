@@ -722,7 +722,7 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.t)sele
 /* ---------- summary / translate ---------- */
 const pageList=a=>{const r=[];for(const n of a){const l=r[r.length-1];if(l&&n===l[1]+1)l[1]=n;else r.push([n,n])}
   return r.map(([a,b])=>a===b?a:a+'–'+b).join(', ')};
-function sumNote(c){if(!c||c.totalPages==null)return '';
+function sumNote(c){if(!c||c.totalPages==null||c.demo)return '';
   if(c.complete)return h('div',{class:'vnote ok',dir:'auto'},ic('check'),h('span',{},t('sumOkCov',c.totalPages)));
   const lines=c.coveredPages===0?[t('sumNone')]:[t('sumCov',c.coveredPages,c.totalPages)];
   if(c.coveredPages>0){if(c.emptyPages.length)lines.push(t('sumEmpty',pageList(c.emptyPages)));

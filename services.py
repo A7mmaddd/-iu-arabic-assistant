@@ -45,9 +45,10 @@ class LLMService(AIService):
         self.LLMService = os.getenv("LLM_MODEL", "gemini-3.8-flash")    # model ID from Google AI Studio
         self.thinking = os.getenv("LLM_THINKING", "LOW").upper()         # MINIMAL / LOW / MEDIUM / HIGH
         self.client = None
-        if os.getenv("GEMINI_API_KEY"):
+        key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip().strip('"').strip("'")
+        if key:
             from google import genai
-            self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+            self.client = genai.Client(api_key=key)
 
     def _gen(self, system, messages, max_tokens=8192, as_json=False):
         """One Gemini call. messages = [{"role": "user"|"assistant", "content": str}].
@@ -181,7 +182,7 @@ class LLMService(AIService):
 
         covered = len(pages) - len(emptyPages) - len(failedPages)
         coverage = {"totalPages": len(pages), "coveredPages": covered, "emptyPages": emptyPages,
-                    "failedPages": failedPages, "tooDense": dense, "note": note,
+                    "failedPages": failedPages, "tooDense": dense, "note": note, "demo": not self.client,
                     "complete": bool(self.client) and covered == len(pages) and not dense and not note}
         bullets = [x for s in sections for x in ([f"**{s['title']}**"] if s["title"] else []) + s["points"]]
         sm = Summary(bullets, terms, frm, to, sections=sections, coverage=coverage)

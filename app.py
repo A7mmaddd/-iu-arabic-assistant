@@ -48,6 +48,12 @@ def logout():
     if u: u.logOut()
     session.clear(); return jsonify(ok=True)
 
+@app.get("/api/status")
+def status():
+    """Shows if the AI key reached the server (never shows the key itself)."""
+    names = sorted(k for k in os.environ if "GEMINI" in k.upper() or "API_KEY" in k.upper() or "COMET" in k.upper())
+    return jsonify(aiReady=ai.client is not None, model=ai.LLMService, keyNamesSeen=names)
+
 @app.get("/api/me")
 def whoami():
     u = me(); return jsonify(name=u.name, role=u.role) if u else err("no session", 401)
