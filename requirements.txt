@@ -1,6 +1,6 @@
 flask
 cryptography
-anthropic
+google-genai
 pypdf
 python-pptx
 google-auth

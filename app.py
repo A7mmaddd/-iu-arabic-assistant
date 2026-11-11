@@ -74,7 +74,8 @@ def summary(fid):
     f = own(fid)
     if not f: return err("Not found", 404)
     j = request.json or {}; s = ai.summarize(f, int(j.get("from", 1)), int(j.get("to", len(f.pages))))
-    SUMMARIES[s.id] = s; return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms)
+    SUMMARIES[s.id] = s
+    return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections, coverage=s.coverage)
 
 @app.post("/api/summaries/<sid>/translate")
 def tr_summary(sid):

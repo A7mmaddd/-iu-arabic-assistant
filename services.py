@@ -1,6 +1,7 @@
 """AuthService, AIService (interface), LLMService — as in the class diagram."""
-import io, json, os
+import io, json, os, time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from models import *
 
 class AuthService:
@@ -38,24 +39,48 @@ class AIService(ABC):
     def verifyQuestion(self, f, q): ...
 
 class LLMService(AIService):
+    DEMO = "[DEMO MODE: set GEMINI_API_KEY for real AI output]"
+
     def __init__(self):
-        self.LLMService = os.getenv("LLM_MODEL", "claude-haiku-5-5")   # must match the model ID shown in CometAPI
+        self.LLMService = os.getenv("LLM_MODEL", "gemini-3.8-flash")    # model ID from Google AI Studio
+        self.thinking = os.getenv("LLM_THINKING", "LOW").upper()         # MINIMAL / LOW / MEDIUM / HIGH
         self.client = None
-        if os.getenv("COMETAPI_KEY"):
-            import anthropic
-            self.client = anthropic.Anthropic(api_key=os.environ["COMETAPI_KEY"],
-                                              base_url="https://api.cometapi.com", max_retries=0)
+        if os.getenv("GEMINI_API_KEY"):
+            from google import genai
+            self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    def _ask(self, system, prompt):
-        return self._chat(system, [{"role": "user", "content": prompt}])
+    def _gen(self, system, messages, max_tokens=8192, as_json=False):
+        """One Gemini call. messages = [{"role": "user"|"assistant", "content": str}].
+        Returns (text, cut) where cut=True means the reply hit max_tokens and is incomplete."""
+        from google.genai import types, errors
+        contents = [types.Content(role="model" if m["role"] == "assistant" else "user",
+                                  parts=[types.Part(text=m["content"])]) for m in messages]
+        cfg = types.GenerateContentConfig(system_instruction=system, max_output_tokens=max_tokens,
+                                          thinking_config=types.ThinkingConfig(thinking_level=self.thinking),
+                                          response_mime_type="application/json" if as_json else None)
+        for attempt in range(4):
+            try:
+                r = self.client.models.generate_content(model=self.LLMService, contents=contents, config=cfg)
+                break
+            except errors.APIError as e:            # 429 = free-tier rate limit, 5xx = Google busy -> wait and retry
+                if e.code not in (429, 500, 503) or attempt == 3: raise
+                time.sleep(5 * 2 ** attempt)
+        cand = (r.candidates or [None])[0]
+        cut = bool(cand and cand.finish_reason == types.FinishReason.MAX_TOKENS)
+        return r.text or "", cut
 
-    def _chat(self, system, messages):
-        if not self.client: return "[DEMO MODE: set COMETAPI_KEY for real AI output]"
-        r = self.client.messages.create(model=self.LLMService, max_tokens=4000, system=system, messages=messages)
-        return "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
+    def _ask(self, system, prompt, **kw):
+        return self._chat(system, [{"role": "user", "content": prompt}], **kw)
 
-    def _json(self, system, prompt):
-        t = self._ask(system + " Reply with JSON only, no markdown.", prompt)
+    def _chat(self, system, messages, max_tokens=8192):
+        if not self.client: return self.DEMO
+        return self._gen(system, messages, max_tokens)[0]
+
+    def _json(self, system, prompt, max_tokens=8192):
+        if not self.client: return None
+        t, cut = self._gen(system + " Reply with JSON only, no markdown.",
+                           [{"role": "user", "content": prompt}], max_tokens, as_json=True)
+        if cut: return None                          # cut-off JSON is broken JSON
         try: return json.loads(t.strip().strip("`").removeprefix("json").strip())
         except Exception: return None
 
@@ -76,20 +101,104 @@ class LLMService(AIService):
         f.pages = [Page(i + 1, t) for i, t in enumerate(texts)]
         f.encrypt()
 
+    # ---- Summary: big files are split into parts, each part is summarized in detail, then all parts are merged ----
+    PART_CHARS = 60_000      # about 15-30 pages of normal text per part
+    MIN_PAGE_CHARS = 30      # less text than this = page is probably a scanned image / picture only
+    SUMMARY_TOKENS = 32_000  # room for a long, detailed answer (Gemini Flash allows up to 65,536)
+
+    PART_PROMPT = ("You write detailed study notes for one part of an Arabic course file. " + RULES +
+                   " Cover EVERY main idea, definition, rule, condition, list, example and evidence in this part; do not"
+                   " skip sections. Write in the same language as the file. Group related ideas instead of writing one"
+                   " line per page. End each point with its page like (p. 12)."
+                   ' Output: {"points":["..."],"keyTerms":["..."],"tooDense":false}.'
+                   " Set tooDense to true only if this part has so much information that you had to leave out"
+                   " important ideas.")
+    MERGE_PROMPT = ("You turn study notes (or course text) into one complete, well-organized summary for a student. " +
+                    RULES + " Organize by topic, not by page. Keep every important idea, definition and key term;"
+                    " merge repeated ideas; keep the page references like (p. 12). Write in the same language as the"
+                    " source. Use as many sections and points as the material needs - a long file needs a long summary."
+                    ' Output: {"sections":[{"title":"...","points":["..."]}],"keyTerms":["..."],"note":""}.'
+                    " Leave note empty unless the material was too large or too dense to cover well; then say in one"
+                    " short sentence what may be missing.")
+
+    def _parts(self, pages):
+        """Split readable pages into parts of about PART_CHARS characters (a page is never split)."""
+        parts, cur, size = [], [], 0
+        for p in pages:
+            if cur and size + len(p.text) > self.PART_CHARS:
+                parts.append(cur); cur, size = [], 0
+            cur.append(p); size += len(p.text)
+        return parts + [cur] if cur else parts
+
+    @staticmethod
+    def _pages_text(pages):
+        return "\n\n".join(f"[Page {p.pageNumber}]\n{p.text}" for p in pages)
+
+    def _summarize_part(self, pages):
+        d = self._json(self.PART_PROMPT, f"PAGES {pages[0].pageNumber}-{pages[-1].pageNumber}:\n\n" +
+                       self._pages_text(pages), max_tokens=self.SUMMARY_TOKENS)
+        if not isinstance(d, dict) or not d.get("points"): return None
+        return d
+
     def summarize(self, f, frm, to):
-        d = self._json("You summarize Arabic course material into simple bullet points. " + self.RULES +
-                       ' Output: {"bulletPoints":[...],"keyTerms":[...]}. Keep important terms.',
-                       self._text(f, frm, to))
-        d = d or {"bulletPoints": [self._ask("Summarize in bullet points.", self._text(f, frm, to))], "keyTerms": []}
-        sm = Summary(d["bulletPoints"], d["keyTerms"], frm, to); f.summaries.append(sm); return sm
+        pages = [p for p in f.pages if frm <= p.pageNumber <= to]
+        readable = [p for p in pages if len(p.text.strip()) >= self.MIN_PAGE_CHARS]
+        emptyPages = [p.pageNumber for p in pages if p not in readable]
+        failedPages, dense, note = [], False, ""
+
+        if not self.client:
+            sections, terms = [{"title": "Demo", "points": [self.DEMO]}], []
+        elif not readable:
+            sections, terms = [], []
+        else:
+            parts = self._parts(readable)
+            if len(parts) == 1:                      # small file: one detailed pass is enough
+                notes, source = None, self._pages_text(readable)
+            else:                                    # big file: detailed notes for each part (3 at a time)
+                with ThreadPoolExecutor(max_workers=3) as ex:
+                    results = list(ex.map(self._safe_part, parts))
+                notes = []
+                for part, d in zip(parts, results):
+                    rng = f"{part[0].pageNumber}-{part[-1].pageNumber}"
+                    if d is None: failedPages += [p.pageNumber for p in part]; continue
+                    dense = dense or bool(d.get("tooDense"))
+                    notes.append({"pages": rng, "points": d["points"], "keyTerms": d.get("keyTerms", [])})
+                source = json.dumps(notes, ensure_ascii=False)
+            d = None
+            if notes is None or notes:
+                try: d = self._json(self.MERGE_PROMPT, source, max_tokens=self.SUMMARY_TOKENS)
+                except Exception: d = None
+            if isinstance(d, dict) and d.get("sections"):
+                sections = [{"title": str(s.get("title", "")), "points": [str(x) for x in s.get("points", [])]}
+                            for s in d["sections"] if isinstance(s, dict)]
+                terms, note = d.get("keyTerms", []), str(d.get("note") or "").strip()
+            elif notes:                              # merge failed -> still show the notes of every part
+                sections = [{"title": f"Pages {n['pages']}", "points": n["points"]} for n in notes]
+                terms = list(dict.fromkeys(t for n in notes for t in n["keyTerms"]))
+            else:                                    # nothing worked
+                sections, terms = [], []
+                if len(parts) == 1: failedPages = [p.pageNumber for p in readable]
+
+        covered = len(pages) - len(emptyPages) - len(failedPages)
+        coverage = {"totalPages": len(pages), "coveredPages": covered, "emptyPages": emptyPages,
+                    "failedPages": failedPages, "tooDense": dense, "note": note,
+                    "complete": bool(self.client) and covered == len(pages) and not dense and not note}
+        bullets = [x for s in sections for x in ([f"**{s['title']}**"] if s["title"] else []) + s["points"]]
+        sm = Summary(bullets, terms, frm, to, sections=sections, coverage=coverage)
+        f.summaries.append(sm); return sm
+
+    def _safe_part(self, pages):
+        try: return self._summarize_part(pages)
+        except Exception: return None
 
     def translatePart(self, f, frm, to):
         src = self._text(f, frm, to)
         t = Translation(src, self._ask("Translate to English. " + self.RULES, src)); f.translations.append(t); return t
 
     def translateSummary(self, s):
-        src = "\n".join("- " + b for b in s.bulletPoints)
-        return Translation(src, self._ask("Translate to English. " + self.RULES, src))
+        src = "\n".join(b if b.startswith("**") else "- " + b for b in s.bulletPoints)
+        return Translation(src, self._ask("Translate to English. Keep the same headings and bullet points. " + self.RULES,
+                                          src, max_tokens=self.SUMMARY_TOKENS))
 
     def answer(self, f, q, history=()):
         """history = earlier ChatMessages this question replies to (oldest first)."""

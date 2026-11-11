@@ -103,9 +103,11 @@ class CourseFile:
     def getPages(self): return self.pages
 
 class Summary:
-    def __init__(self, bulletPoints, keyTerms, pageFrom, pageTo):
+    def __init__(self, bulletPoints, keyTerms, pageFrom, pageTo, sections=None, coverage=None):
         self.id, self.bulletPoints, self.keyTerms = new_id(), bulletPoints, keyTerms
         self.pageFrom, self.pageTo, self.createdAt = pageFrom, pageTo, datetime.now()
+        self.sections = sections or []      # [{"title": str, "points": [str]}] grouped by topic
+        self.coverage = coverage or {}      # how much of the file the summary really covers (for the warning)
 
 class Translation:
     def __init__(self, sourceText, translatedText, targetLanguage="English"):

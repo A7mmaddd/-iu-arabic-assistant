@@ -8,9 +8,9 @@ services:
     # so every request must reach the same process.
     startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 300 --bind 0.0.0.0:$PORT
     envVars:
-      - key: COMETAPI_KEY
+      - key: GEMINI_API_KEY
         sync: false          # Render asks you for the value once, then keeps it
       - key: LLM_MODEL
-        value: claude-haiku-5-5
+        value: gemini-3.8-flash
       - key: SECRET_KEY
         generateValue: true

@@ -510,7 +510,13 @@ en:{
  noFileSel:'No file selected',pagesLbl:'Pages',to:'to',all:'All',of:n=>'of '+n,
  tSum:'Summary',tTr:'Translate',tTu:'AI tutor',tQz:'Quiz',tEx:'Exam questions',
  needFile:'Upload a file first, then select it in the files list.',
- sumHint:'Turn the selected pages into simple bullet points.',bSum:'Summarize pages',bTrs:'Translate this summary',sumBusy:'Summarizing… this can take a minute.',trsBusy:'Translating the summary…',
+ sumHint:'Turn the selected pages into simple bullet points.',bSum:'Summarize pages',bTrs:'Translate this summary',sumBusy:'Summarizing… big files can take a few minutes.',trsBusy:'Translating the summary…',
+ sumWarnTitle:'This summary may not be complete',sumOkCov:n=>'Covers all '+n+' pages.',
+ sumCov:(c,n)=>'The summary covers '+c+' of '+n+' pages.',
+ sumEmpty:p=>'No text could be read on pages '+p+' (they may be scanned images or pictures).',
+ sumFailed:p=>'The AI could not process pages '+p+'. Try summarizing them again as a smaller range.',
+ sumDense:'The file has a lot of information, so some details may be left out. For more accuracy, summarize a smaller range of pages.',
+ sumNone:'Nothing could be summarized. The file may be scanned images, or the AI is busy — please try again.',
  sumTitle:'Summary',sumTrTitle:'English translation',
  trHint:'Translate the selected pages into English.',bTr:'Translate pages',trBusy:'Translating…',trTitle:'Translation',
  tuHint:'Answers come only from your uploaded file.',askPh:'Ask a question about your file',ask:'Ask',tuEmpty:'Ask anything about your file',
@@ -549,7 +555,13 @@ ar:{
  noFileSel:'لم يتم اختيار ملف',pagesLbl:'الصفحات',to:'إلى',all:'الكل',of:n=>'من '+n,
  tSum:'الملخص',tTr:'الترجمة',tTu:'المعلّم الذكي',tQz:'اختبار',tEx:'أسئلة الامتحان',
  needFile:'ارفع ملفًا أولًا ثم اختره من قائمة الملفات.',
- sumHint:'حوّل الصفحات المحددة إلى نقاط بسيطة ومختصرة.',bSum:'لخّص الصفحات',bTrs:'ترجمة الملخص',sumBusy:'جارٍ التلخيص… قد يستغرق دقيقة.',trsBusy:'جارٍ ترجمة الملخص…',
+ sumHint:'حوّل الصفحات المحددة إلى نقاط بسيطة ومختصرة.',bSum:'لخّص الصفحات',bTrs:'ترجمة الملخص',sumBusy:'جارٍ التلخيص… الملفات الكبيرة قد تستغرق بضع دقائق.',trsBusy:'جارٍ ترجمة الملخص…',
+ sumWarnTitle:'قد لا يكون هذا الملخص كاملاً',sumOkCov:n=>'يغطي جميع الصفحات ('+n+').',
+ sumCov:(c,n)=>'الملخص يغطي '+c+' من أصل '+n+' صفحة.',
+ sumEmpty:p=>'تعذّرت قراءة النص في الصفحات '+p+' (قد تكون صورًا أو صفحات ممسوحة ضوئيًا).',
+ sumFailed:p=>'لم يتمكن الذكاء الاصطناعي من معالجة الصفحات '+p+'. جرّب تلخيصها مرة أخرى كنطاق أصغر.',
+ sumDense:'الملف يحتوي على معلومات كثيرة جدًا، لذلك قد تُختصر بعض التفاصيل. لدقة أعلى، لخّص عددًا أقل من الصفحات.',
+ sumNone:'تعذّر تلخيص أي شيء. قد يكون الملف صورًا ممسوحة، أو أن الخدمة مشغولة — حاول مرة أخرى.',
  sumTitle:'الملخص',sumTrTitle:'الترجمة الإنجليزية',
  trHint:'ترجم الصفحات المحددة إلى الإنجليزية.',bTr:'ترجمة الصفحات',trBusy:'جارٍ الترجمة…',trTitle:'الترجمة',
  tuHint:'الإجابات تأتي من ملفك المرفوع فقط.',askPh:'اسأل سؤالًا عن ملفك',ask:'إرسال',tuEmpty:'اسأل أي شيء عن ملفك',
@@ -708,10 +720,23 @@ function selectTab(name){const b=$(`#tabs button[data-t=${name}]`);if(!b)return;
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.t)selectTab(b.dataset.t)};
 
 /* ---------- summary / translate ---------- */
+const pageList=a=>{const r=[];for(const n of a){const l=r[r.length-1];if(l&&n===l[1]+1)l[1]=n;else r.push([n,n])}
+  return r.map(([a,b])=>a===b?a:a+'–'+b).join(', ')};
+function sumNote(c){if(!c||c.totalPages==null)return '';
+  if(c.complete)return h('div',{class:'vnote ok',dir:'auto'},ic('check'),h('span',{},t('sumOkCov',c.totalPages)));
+  const lines=c.coveredPages===0?[t('sumNone')]:[t('sumCov',c.coveredPages,c.totalPages)];
+  if(c.coveredPages>0){if(c.emptyPages.length)lines.push(t('sumEmpty',pageList(c.emptyPages)));
+    if(c.failedPages.length)lines.push(t('sumFailed',pageList(c.failedPages)));
+    if(c.tooDense)lines.push(t('sumDense'));if(c.note)lines.push(c.note)}
+  return h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
+    h('span',{},h('b',{},t('sumWarnTitle')),...lines.map(x=>h('div',{},x))))}
 $('#bsum').onclick=function(){if(!ready())return;put('#o-sum2');
   run('#o-sum',t('sumBusy'),async()=>{const s=await api(`/api/files/${S.fid}/summary`,'POST',rng());S.sid=s.id;$('#btrs').disabled=false;
     const pts=[].concat(s.bulletPoints||[]);
-    const body=h('div',{},h('ul',{},...pts.map(b=>h('li',{dir:'auto'},...inline(b)))),
+    const secs=(s.sections&&s.sections.length)?s.sections:[{title:'',points:pts}];
+    const body=h('div',{},sumNote(s.coverage),
+      ...secs.flatMap(x=>[x.title?h('h4',{dir:'auto',style:'margin:14px 0 4px'},x.title):'',
+        h('ul',{},...x.points.map(b=>h('li',{dir:'auto'},...inline(b))))]),
       s.keyTerms&&s.keyTerms.length?h('div',{class:'chips'},...s.keyTerms.map(k=>h('span',{class:'chip',dir:'auto'},k))):'');
     put('#o-sum',card(t('sumTitle'),body,pts.join('\n')+(s.keyTerms&&s.keyTerms.length?'\n\n'+s.keyTerms.join(', '):'')))},this)};
 $('#btrs').onclick=function(){if(!S.sid)return;

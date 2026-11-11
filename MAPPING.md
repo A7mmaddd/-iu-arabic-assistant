@@ -20,14 +20,14 @@
 ## services.py
 | Class | Line | Methods (line) |
 |---|---|---|
-| AuthService | 6 | authenticateWithGoogle (8), validateSession (20) |
-| AIService (interface, ABC) | 22 | processFile (24), summarize (26), translatePart (28), translateSummary (30), answer (32), generateQuiz (34), generateExam (36), verifyQuestion (38) |
-| LLMService (extends AIService) | 40 | processFile (68), summarize (79), translatePart (86), translateSummary (90), answer (94), generateQuiz (118), generateExam (123), verifyQuestion (136) |
+| AuthService | 7 | authenticateWithGoogle (9), validateSession (21) |
+| AIService (interface, ABC) | 23 | processFile (25), summarize (27), translatePart (29), translateSummary (31), answer (33), generateQuiz (35), generateExam (37), verifyQuestion (39) |
+| LLMService (extends AIService) — uses Google Gemini | 41 | processFile (93), summarize (143, splits big files into parts + coverage warning), translatePart (194), translateSummary (198), answer (203), generateQuiz (227), generateExam (232), verifyQuestion (245) |
 
 ## static/index.html
 | Class | Where | Methods |
 |---|---|---|
-| SpeechService «Service» | `const SpeechService` (line 725) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
+| SpeechService «Service» | `const SpeechService` (line 750) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
 
 ## app.py (web routes that use the classes)
 | Use case | Route | Code used |
