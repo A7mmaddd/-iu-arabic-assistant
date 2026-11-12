@@ -130,6 +130,9 @@ aside.dragging::after{content:attr(data-drop);position:absolute;inset:8px;border
 .file .tx b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .file .tx small{display:block;color:var(--mut);font-weight:400;font-size:12px}
 .file.on{border-color:var(--brand);background:var(--soft);box-shadow:inset 4px 0 0 var(--brand)}
+.fwrap{position:relative}.fwrap .file{width:100%;padding-inline-end:48px}
+.fwrap .fdel{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);padding:6px;min-height:0;line-height:0;border-color:transparent;color:var(--mut)}
+.fwrap .fdel:hover:not(:disabled){color:var(--bad);border-color:currentColor;transform:translateY(-50%)}
 .ext{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:10.5px;font-weight:800;letter-spacing:.03em;flex:none;color:#fff;background:#d8493b}
 .ext.ppt,.ext.pptx{background:#e07a1f}
 .ext.other{background:var(--mut)}
@@ -510,7 +513,7 @@ en:{
  noFileSel:'No file selected',pagesLbl:'Pages',to:'to',all:'All',of:n=>'of '+n,
  tSum:'Summary',tTr:'Translate',tTu:'AI tutor',tQz:'Quiz',tEx:'Exam questions',
  needFile:'Upload a file first, then select it in the files list.',
- sumHint:'Turn the selected pages into simple bullet points.',bSum:'Summarize pages',bTrs:'Translate this summary',sumBusy:'Summarizing… big files can take a few minutes.',trsBusy:'Translating the summary…',
+ sumHint:'Turn the selected pages into a clear summary (15 pages per part).',bSum:'Summarize pages',bTrs:'Translate this summary',sumBusy:'Summarizing…',trsBusy:'Translating the summary…',
  sumWarnTitle:'This summary may not be complete',sumOkCov:n=>'Covers all '+n+' pages.',
  sumCov:(c,n)=>'The summary covers '+c+' of '+n+' pages.',
  sumEmpty:p=>'No text could be read on pages '+p+' (they may be scanned images or pictures).',
@@ -542,7 +545,10 @@ en:{
  pubTitle:'Published exam',shareCode:'Share this code with your students',locked:'Published exams are locked and cannot be edited.',
  results:'Student results',refresh:'Refresh',noAttempts:'No student has taken this exam yet.',colName:'Name',colEmail:'Email',colScore:'Score',colTime:'Submitted',
  avg:(n,p)=>n+(n===1?' student':' students')+' · average '+p+'%',myExams:'My exams',draft:'Draft',open:'Open',attemptsN:n=>n+(n===1?' attempt':' attempts'),loading:'Loading…',
-uploaded:'File uploaded',reading:n=>'Reading '+n+'…',badType:'Only PDF, PPT or PPTX files are accepted.',tooBig:'File is larger than 300 MB.',
+uploaded:'File uploaded',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
+ sumPart:(a,b)=>'Pages '+a+'–'+b,sumPartBusy:(a,b)=>'Summarizing pages '+a+'–'+b+'…',sumProg:(d,n)=>'Summarized '+d+' of '+n+' parts',
+ sumBatchInfo:n=>'Large ranges are summarized 15 pages at a time ('+n+' parts). Each part appears as soon as it is ready.',retry:'Try again',aiBusy:'The AI is busy right now (Google servers or the free limit). Please try again in a minute.',
+ reading:n=>'Reading '+n+'…',badType:'Only PDF, PPT or PPTX files are accepted.',tooBig:'File is larger than 300 MB.',
  netErr:'Cannot reach the server. Check your connection and try again (the server may take up to a minute to wake up).',
  srvErr:'Server error. Please try again.',generic:'Something went wrong'},
 ar:{
@@ -555,7 +561,7 @@ ar:{
  noFileSel:'لم يتم اختيار ملف',pagesLbl:'الصفحات',to:'إلى',all:'الكل',of:n=>'من '+n,
  tSum:'الملخص',tTr:'الترجمة',tTu:'المعلّم الذكي',tQz:'اختبار',tEx:'أسئلة الامتحان',
  needFile:'ارفع ملفًا أولًا ثم اختره من قائمة الملفات.',
- sumHint:'حوّل الصفحات المحددة إلى نقاط بسيطة ومختصرة.',bSum:'لخّص الصفحات',bTrs:'ترجمة الملخص',sumBusy:'جارٍ التلخيص… الملفات الكبيرة قد تستغرق بضع دقائق.',trsBusy:'جارٍ ترجمة الملخص…',
+ sumHint:'حوّل الصفحات المحددة إلى ملخص واضح (15 صفحة لكل جزء).',bSum:'لخّص الصفحات',bTrs:'ترجمة الملخص',sumBusy:'جارٍ التلخيص…',trsBusy:'جارٍ ترجمة الملخص…',
  sumWarnTitle:'قد لا يكون هذا الملخص كاملاً',sumOkCov:n=>'يغطي جميع الصفحات ('+n+').',
  sumCov:(c,n)=>'الملخص يغطي '+c+' من أصل '+n+' صفحة.',
  sumEmpty:p=>'تعذّرت قراءة النص في الصفحات '+p+' (قد تكون صورًا أو صفحات ممسوحة ضوئيًا).',
@@ -587,7 +593,10 @@ ar:{
  pubTitle:'الامتحان منشور',shareCode:'شارك هذا الرمز مع طلابك',locked:'الامتحان المنشور مقفل ولا يمكن تعديله.',
  results:'نتائج الطلاب',refresh:'تحديث',noAttempts:'لم يحل أي طالب هذا الامتحان بعد.',colName:'الاسم',colEmail:'البريد',colScore:'الدرجة',colTime:'وقت التسليم',
  avg:(n,p)=>n+' طالب · المتوسط '+p+'%',myExams:'امتحاناتي',draft:'مسودة',open:'فتح',attemptsN:n=>n+' محاولة',loading:'جارٍ التحميل…',
-uploaded:'تم رفع الملف',reading:n=>'جارٍ قراءة '+n+'…',badType:'الملفات المقبولة: PDF أو PPT أو PPTX فقط.',tooBig:'حجم الملف أكبر من 300 ميغابايت.',
+uploaded:'تم رفع الملف',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
+ sumPart:(a,b)=>'الصفحات '+a+'–'+b,sumPartBusy:(a,b)=>'جارٍ تلخيص الصفحات '+a+'–'+b+'…',sumProg:(d,n)=>'تم تلخيص '+d+' من '+n+' أجزاء',
+ sumBatchInfo:n=>'النطاقات الكبيرة تُلخّص كل 15 صفحة على حدة ('+n+' أجزاء). يظهر كل جزء فور جاهزيته.',retry:'إعادة المحاولة',aiBusy:'الذكاء الاصطناعي مشغول الآن (ضغط على خوادم Google أو انتهى الحد المجاني). حاول مرة أخرى بعد دقيقة.',
+ reading:n=>'جارٍ قراءة '+n+'…',badType:'الملفات المقبولة: PDF أو PPT أو PPTX فقط.',tooBig:'حجم الملف أكبر من 300 ميغابايت.',
  netErr:'تعذّر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى (قد يحتاج الخادم دقيقة حتى يستيقظ).',
  srvErr:'خطأ في الخادم. حاول مرة أخرى.',generic:'حدث خطأ ما'}
 };
@@ -673,10 +682,14 @@ async function loadFiles(sel){S.files=await api('/api/files');
   if(sel)S.fid=sel;else if(!S.files.find(f=>f.id===S.fid))S.fid=S.files[0]?.id||null;pick(S.fid)}
 function drawFiles(){$('#fcount').textContent=S.files.length;
   put('#files',...(S.files.length?S.files.map(f=>{const ex=(f.name.split('.').pop()||'').toLowerCase();
-    return h('button',{class:'file'+(f.id===S.fid?' on':''),type:'button',onclick:()=>{pick(f.id);closeDrawer()}},
+    return h('div',{class:'fwrap'},h('button',{class:'file'+(f.id===S.fid?' on':''),type:'button',onclick:()=>{pick(f.id);closeDrawer()}},
       h('span',{class:'ext '+(['pdf','ppt','pptx'].includes(ex)?ex:'other')},ex.slice(0,4)||'?'),
-      h('span',{class:'tx'},h('b',{dir:'auto'},f.name),h('small',{},t('pagesN',f.pages))))}):[note(t('noFiles'))]))}
-function resetOutputs(){S.sid=null;S.quiz=null;$('#btrs').disabled=true;setReply(null);SpeechService.stopSpeaking();
+      h('span',{class:'tx'},h('b',{dir:'auto'},f.name),h('small',{},t('pagesN',f.pages)))),
+      h('button',{class:'ghost fdel',type:'button',title:t('delFile'),'aria-label':t('delFile'),onclick:()=>delFile(f)},ic('trash')))}):[note(t('noFiles'))]))}
+async function delFile(f){if(!confirm(t('delAsk',f.name)))return;
+  try{await api(`/api/files/${f.id}`,'DELETE');if(S.fid===f.id){S.fid=null;resetOutputs()}
+    await loadFiles();toast(t('deleted'),'ok')}catch(x){toast(x,'err')}}
+function resetOutputs(){S.sid=null;S.sids=[];S.quiz=null;$('#btrs').disabled=true;setReply(null);SpeechService.stopSpeaking();
   ['#o-sum','#o-sum2','#o-tr','#o-qz','#chat'].forEach(i=>put(i));drawTutorEmpty()}
 function pick(id){S.fid=id;const f=cur();
   if(S.last!==undefined&&S.last!==id)resetOutputs();S.last=id;
@@ -730,18 +743,37 @@ function sumNote(c){if(!c||c.totalPages==null||c.demo)return '';
     if(c.tooDense)lines.push(t('sumDense'));if(c.note)lines.push(c.note)}
   return h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
     h('span',{},h('b',{},t('sumWarnTitle')),...lines.map(x=>h('div',{},x))))}
-$('#bsum').onclick=function(){if(!ready())return;put('#o-sum2');
-  run('#o-sum',t('sumBusy'),async()=>{const s=await api(`/api/files/${S.fid}/summary`,'POST',rng());S.sid=s.id;$('#btrs').disabled=false;
-    const pts=[].concat(s.bulletPoints||[]);
-    const secs=(s.sections&&s.sections.length)?s.sections:[{title:'',points:pts}];
-    const body=h('div',{},sumNote(s.coverage),
-      ...secs.flatMap(x=>[x.title?h('h4',{dir:'auto',style:'margin:14px 0 4px'},x.title):'',
-        h('ul',{},...x.points.map(b=>h('li',{dir:'auto'},...inline(b))))]),
-      s.keyTerms&&s.keyTerms.length?h('div',{class:'chips'},...s.keyTerms.map(k=>h('span',{class:'chip',dir:'auto'},k))):'');
-    put('#o-sum',card(t('sumTitle'),body,pts.join('\n')+(s.keyTerms&&s.keyTerms.length?'\n\n'+s.keyTerms.join(', '):'')))},this)};
-$('#btrs').onclick=function(){if(!S.sid)return;
-  run('#o-sum2',t('trsBusy'),async()=>{const r=await api(`/api/summaries/${S.sid}/translate`,'POST');
-    put('#o-sum2',card(t('sumTrTitle'),rich(r.text),r.text));$('#o-sum2').scrollIntoView({behavior:'smooth',block:'nearest'})},this)};
+const SUM_MAX=15,SUM_PAR=3;   // 15 pages per request (same limit as the server); 3 parts at the same time
+function sumCard(s,title){const pts=[].concat(s.bulletPoints||[]);
+  const secs=(s.sections&&s.sections.length)?s.sections:[{title:'',points:pts}];
+  const body=h('div',{},sumNote(s.coverage),
+    ...secs.flatMap(x=>[x.title?h('h4',{dir:'auto',style:'margin:14px 0 4px'},x.title):'',
+      h('ul',{},...x.points.map(b=>h('li',{dir:'auto'},...inline(b))))]),
+    s.keyTerms&&s.keyTerms.length?h('div',{class:'chips'},...s.keyTerms.map(k=>h('span',{class:'chip',dir:'auto'},k))):'');
+  return card(title,body,pts.join('\n')+(s.keyTerms&&s.keyTerms.length?'\n\n'+s.keyTerms.join(', '):''))}
+$('#bsum').onclick=async function(){if(!ready())return;put('#o-sum2');
+  const btn=this,fid=S.fid,{from,to}=rng(),parts=[];
+  for(let a=from;a<=to;a+=SUM_MAX)parts.push([a,Math.min(to,a+SUM_MAX-1)]);
+  const many=parts.length>1,done=new Array(parts.length).fill(null);
+  const prog=h('div',{class:'hint',dir:'auto'}),slots=parts.map(()=>h('div',{style:'margin-top:12px'}));
+  S.sid=null;S.sids=done;$('#btrs').disabled=true;
+  put('#o-sum',...(many?[h('p',{class:'hint',dir:'auto'},t('sumBatchInfo',parts.length)),prog]:[]),...slots);
+  const showProg=()=>{const n=done.filter(Boolean).length;prog.textContent=t('sumProg',n,parts.length);
+    $('#btrs').disabled=!n};
+  const one=async i=>{const [a,b]=parts[i];slots[i].replaceChildren(skel(many?t('sumPartBusy',a,b):t('sumBusy')));
+    try{const s=await api(`/api/files/${fid}/summary`,'POST',{from:a,to:b});if(S.fid!==fid)return;
+      done[i]=s.id;S.sid=s.id;slots[i].replaceChildren(sumCard(s,many?t('sumTitle')+' · '+t('sumPart',a,b):t('sumTitle')))}
+    catch(x){if(S.fid!==fid)return;const rb=h('button',{class:'ghost',type:'button'},ic('refresh'),t('retry'));
+      rb.onclick=()=>{rb.disabled=true;one(i).then(showProg)};
+      slots[i].replaceChildren(h('div',{},fail((many?t('sumPart',a,b)+': ':'')+(String(x).startsWith('The AI is busy')?t('aiBusy'):x)),h('div',{class:'row',style:'margin-top:8px'},rb)))}};
+  btn.disabled=true;if(many)showProg();
+  let next=0;const worker=async()=>{while(next<parts.length&&S.fid===fid){await one(next++);if(many)showProg()}};
+  try{await Promise.all(Array.from({length:Math.min(SUM_PAR,parts.length)},worker))}finally{btn.disabled=false}};
+$('#btrs').onclick=function(){const ids=(S.sids||[]).filter(Boolean);if(!ids.length)return;
+  run('#o-sum2',t('trsBusy'),async()=>{const out=[];
+    for(const id of ids){const r=await api(`/api/summaries/${id}/translate`,'POST');out.push(r.text)}
+    const txt=out.join('\n\n');
+    put('#o-sum2',card(t('sumTrTitle'),rich(txt),txt));$('#o-sum2').scrollIntoView({behavior:'smooth',block:'nearest'})},this)};
 $('#btr').onclick=function(){if(!ready())return;
   run('#o-tr',t('trBusy'),async()=>{const r=await api(`/api/files/${S.fid}/translate`,'POST',rng());
     put('#o-tr',card(t('trTitle'),h('div',{class:'plain'},r.text),r.text))},this)};

@@ -22,19 +22,20 @@
 |---|---|---|
 | AuthService | 7 | authenticateWithGoogle (9), validateSession (21) |
 | AIService (interface, ABC) | 23 | processFile (25), summarize (27), translatePart (29), translateSummary (31), answer (33), generateQuiz (35), generateExam (37), verifyQuestion (39) |
-| LLMService (extends AIService) — uses Google Gemini | 41 | processFile (93), summarize (143, splits big files into parts + coverage warning), translatePart (194), translateSummary (198), answer (203), generateQuiz (227), generateExam (232), verifyQuestion (245) |
+| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 41 | processFile (114), summarize (164, splits big files into parts + coverage warning), translatePart (215), translateSummary (219), answer (224), generateQuiz (248), generateExam (253), verifyQuestion (266) |
 
 ## static/index.html
 | Class | Where | Methods |
 |---|---|---|
-| SpeechService «Service» | `const SpeechService` (line 750) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
+| SpeechService «Service» | `const SpeechService` (line 782) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
 
 ## app.py (web routes that use the classes)
 | Use case | Route | Code used |
 |---|---|---|
 | Register / Login with Google | POST /api/login | AuthService.authenticateWithGoogle |
 | Upload Course File | POST /api/files | User.uploadFile → CourseFile.validate, LLMService.processFile → CourseFile.encrypt |
-| Summarize Content | POST /api/files/<id>/summary | LLMService.summarize |
+| Summarize Content | POST /api/files/<id>/summary (max 15 pages per call; the page sends bigger ranges in parts) | LLMService.summarize |
+| **NEW** Delete Uploaded File | DELETE /api/files/<id> | removes the CourseFile and its Summaries |
 | Translate Summary | POST /api/summaries/<id>/translate | LLMService.translateSummary |
 | Translate Selected Part | POST /api/files/<id>/translate | LLMService.translatePart |
 | Ask AI Tutor (+ reject unrelated) | POST /api/files/<id>/ask | Student.askTutor → LLMService.answer, NOT_RELATED check |

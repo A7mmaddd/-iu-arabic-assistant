@@ -1,5 +1,5 @@
 """AuthService, AIService (interface), LLMService — as in the class diagram."""
-import io, json, os, time
+import io, json, os, threading, time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from models import *
@@ -41,34 +41,54 @@ class AIService(ABC):
 class LLMService(AIService):
     DEMO = "[DEMO MODE: set GEMINI_API_KEY for real AI output]"
 
+    # Several Gemini models, one API key. Each model has its own free-tier limit, so using several
+    # gives more requests per minute, and when one model is busy (503) or at its limit (429) we move on.
+    DEFAULT_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash"
+    BUSY = (429, 500, 503, 504)
+
     def __init__(self):
-        self.LLMService = os.getenv("LLM_MODEL", "gemini-3.8-flash")    # model ID from Google AI Studio
-        self.thinking = os.getenv("LLM_THINKING", "LOW").upper()         # MINIMAL / LOW / MEDIUM / HIGH
-        self.client = None
+        names = os.getenv("LLM_MODELS") or os.getenv("LLM_MODEL") or self.DEFAULT_MODELS
+        self.models = [m.strip() for m in names.split(",") if m.strip()]
+        self.LLMService = self.models[0]                                  # main model (shown in /api/status)
+        self.thinking = os.getenv("LLM_THINKING", "MINIMAL").upper()      # MINIMAL saves the most tokens
+        self.client, self._turn, self._lock = None, 0, threading.Lock()
         key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip().strip('"').strip("'")
         if key:
             from google import genai
             self.client = genai.Client(api_key=key)
 
+    def _order(self):
+        """Each call starts with the next model in the list, so parallel calls are spread over all models."""
+        with self._lock:
+            i = self._turn % len(self.models); self._turn += 1
+        return self.models[i:] + self.models[:i]
+
     def _gen(self, system, messages, max_tokens=8192, as_json=False):
-        """One Gemini call. messages = [{"role": "user"|"assistant", "content": str}].
+        """One AI call. messages = [{"role": "user"|"assistant", "content": str}].
         Returns (text, cut) where cut=True means the reply hit max_tokens and is incomplete."""
         from google.genai import types, errors
         contents = [types.Content(role="model" if m["role"] == "assistant" else "user",
                                   parts=[types.Part(text=m["content"])]) for m in messages]
-        cfg = types.GenerateContentConfig(system_instruction=system, max_output_tokens=max_tokens,
-                                          thinking_config=types.ThinkingConfig(thinking_level=self.thinking),
-                                          response_mime_type="application/json" if as_json else None)
-        for attempt in range(4):
-            try:
-                r = self.client.models.generate_content(model=self.LLMService, contents=contents, config=cfg)
-                break
-            except errors.APIError as e:            # 429 = free-tier rate limit, 5xx = Google busy -> wait and retry
-                if e.code not in (429, 500, 503) or attempt == 3: raise
-                time.sleep(5 * 2 ** attempt)
-        cand = (r.candidates or [None])[0]
-        cut = bool(cand and cand.finish_reason == types.FinishReason.MAX_TOKENS)
-        return r.text or "", cut
+        def cfg(thinking):
+            return types.GenerateContentConfig(
+                system_instruction=system, max_output_tokens=max_tokens,
+                thinking_config=types.ThinkingConfig(thinking_level=self.thinking) if thinking else None,
+                response_mime_type="application/json" if as_json else None)
+        last = None
+        for rnd in range(2):                         # try every model; if all are busy, wait a little and try once more
+            if rnd: time.sleep(4)
+            for model in self._order():
+                try:
+                    try: r = self.client.models.generate_content(model=model, contents=contents, config=cfg(True))
+                    except errors.ClientError as e:  # model does not accept the thinking setting -> call without it
+                        if e.code != 400 or "think" not in str(e).lower(): raise
+                        r = self.client.models.generate_content(model=model, contents=contents, config=cfg(False))
+                except errors.APIError as e:
+                    if e.code in self.BUSY or e.code == 404: last = e; continue   # busy / not available -> next model
+                    raise
+                cand = (r.candidates or [None])[0]
+                return r.text or "", bool(cand and cand.finish_reason == types.FinishReason.MAX_TOKENS)
+        raise last
 
     def _ask(self, system, prompt, **kw):
         return self._chat(system, [{"role": "user", "content": prompt}], **kw)

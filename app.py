@@ -52,7 +52,7 @@ def logout():
 def status():
     """Shows if the AI key reached the server (never shows the key itself)."""
     names = sorted(k for k in os.environ if "GEMINI" in k.upper() or "API_KEY" in k.upper() or "COMET" in k.upper())
-    return jsonify(aiReady=ai.client is not None, model=ai.LLMService, keyNamesSeen=names)
+    return jsonify(aiReady=ai.client is not None, model=ai.LLMService, models=ai.models, keyNamesSeen=names)
 
 @app.get("/api/me")
 def whoami():
@@ -74,14 +74,34 @@ def files():
         u.files.remove(f); return err(f"Could not read the file: {e}")
     FILES[f.id] = f; return jsonify(id=f.id, name=f.fileName, pages=len(f.pages))
 
+@app.delete("/api/files/<fid>")
+def delete_file(fid):
+    """Delete a file uploaded by mistake (and its summaries). Published exams keep their own copy of the questions."""
+    if locked(): return err(EXAM_LOCK, 423)
+    f, u = own(fid), me()
+    if not f: return err("Not found", 404)
+    FILES.pop(fid, None)
+    if f in u.files: u.files.remove(f)
+    for s in f.summaries: SUMMARIES.pop(s.id, None)
+    return jsonify(ok=True)
+
+MAX_SUMMARY_PAGES = 15      # one summary request = at most 15 pages; the page asks for bigger ranges in parts
+
 @app.post("/api/files/<fid>/summary")
 def summary(fid):
     if locked(): return err(EXAM_LOCK, 423)
     f = own(fid)
     if not f: return err("Not found", 404)
-    j = request.json or {}; s = ai.summarize(f, int(j.get("from", 1)), int(j.get("to", len(f.pages))))
+    j = request.json or {}
+    frm = max(1, int(j.get("from", 1)))
+    to = min(int(j.get("to", len(f.pages))), frm + MAX_SUMMARY_PAGES - 1, len(f.pages))
+    s = ai.summarize(f, frm, to)
+    if s.coverage.get("failedPages") and not s.coverage.get("coveredPages"):   # AI failed for every page -> let the page offer "Try again"
+        f.summaries.remove(s)
+        return err("The AI is busy right now (Google servers or free-tier limit). Please try again in a minute.", 503)
     SUMMARIES[s.id] = s
-    return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections, coverage=s.coverage)
+    return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections,
+                   coverage=s.coverage, pageFrom=frm, pageTo=to)
 
 @app.post("/api/summaries/<sid>/translate")
 def tr_summary(sid):

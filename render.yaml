@@ -10,7 +10,9 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false          # Render asks you for the value once, then keeps it
-      - key: LLM_MODEL
-        value: gemini-3.8-flash
+      - key: LLM_MODELS     # tried in this order; a busy model is skipped
+        value: gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash
+      - key: LLM_THINKING
+        value: MINIMAL
       - key: SECRET_KEY
         generateValue: true

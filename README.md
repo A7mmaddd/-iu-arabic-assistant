@@ -2,13 +2,15 @@
 Python 3.10+ / Flask. Run:
     pip install -r requirements.txt
     export GEMINI_API_KEY=...           # from aistudio.google.com; without it the AI replies in demo mode
+    export LLM_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash   # optional; this is the default
     export GOOGLE_CLIENT_ID=...         # optional; without it a demo login is shown
     python app.py                       # http://127.0.0.1:5000
 Files: models.py (class diagram classes), services.py (AuthService, AIService, LLMService), app.py (web routes),
 static/index.html (UI + SpeechService). MAPPING.md shows where every class and use case is in the code.
 
 ## Features
-Student: summary, translation, AI tutor (reply to an answer, ask by voice, listen to answers), quizzes,
+Student: summary (15 pages per part; bigger ranges are done in parts that appear one by one,
+with a warning when pages could not be read), delete an uploaded file, translation, AI tutor (reply to an answer, ask by voice, listen to answers), quizzes,
 take a published exam (exam mode locks the other features and counts leaving the page).
 Instructor: generate exam questions in English or Arabic, edit questions and options, add own questions
 (checked against the file), print or copy the exam (with or without answer key), publish with a code,
