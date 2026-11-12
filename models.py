@@ -97,6 +97,7 @@ class CourseFile:
         self.uploadDate = datetime.now()
         self.retentionUntil = self.uploadDate + timedelta(days=180)  # one semester
         self.pages, self.raw, self._blob = [], b"", b""          # pages: CourseFile *-- Page (1..*)
+        self.hash = None                                         # SHA-256 of the file (database key, set on upload)
         self.summaries, self.translations, self.quizzes = [], [], []   # CourseFile -> Summary / Translation / Quiz (0..*)
     def validate(self): return self.fileType in self.ALLOWED and 0 < self.size <= self.MAX
     def encrypt(self): self._blob = _fernet.encrypt(self.raw); self.raw = b""

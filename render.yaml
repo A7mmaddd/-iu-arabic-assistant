@@ -16,3 +16,11 @@ services:
         value: MINIMAL
       - key: SECRET_KEY
         generateValue: true
+      - key: FIREBASE_CREDENTIALS   # whole service-account JSON from Firebase (Project settings -> Service accounts)
+        sync: false
+      - key: GOOGLE_CLIENT_ID       # OAuth Web client ID; turns on Google sign-in and turns off the demo login
+        value: 40606909952-t85saujbh7mh3dkle5onssg52r53jfis.apps.googleusercontent.com
+      - key: INSTRUCTOR_EMAILS      # optional, comma list; if set, only these e-mails are instructors
+        sync: false
+      - key: ALLOWED_EMAIL_DOMAIN   # optional, e.g. iu.edu.sa; if set, only that domain can sign in
+        sync: false

@@ -20,22 +20,29 @@
 ## services.py
 | Class | Line | Methods (line) |
 |---|---|---|
-| AuthService | 7 | authenticateWithGoogle (9), validateSession (21) |
-| AIService (interface, ABC) | 23 | processFile (25), summarize (27), translatePart (29), translateSummary (31), answer (33), generateQuiz (35), generateExam (37), verifyQuestion (39) |
-| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 41 | processFile (114), summarize (164, splits big files into parts + coverage warning), translatePart (215), translateSummary (219), answer (224), generateQuiz (248), generateExam (253), verifyQuestion (266) |
+| AuthService | 7 | authenticateWithGoogle (36), restore, validateSession (56) |
+| AIService (interface, ABC) | 58 | processFile (60), summarize (62), translatePart (64), translateSummary (66), answer (68), generateQuiz (70), generateExam (72), verifyQuestion (74) |
+| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 76 | processFile (163), summarize (212, splits big files into parts + coverage warning), translatePart (265), translateSummary (269), answer (274), generateQuiz (312), generateExam (318), verifyQuestion (331) |
+
+## store.py
+| Class | Methods |
+|---|---|
+| Store (Firestore, memory fallback) | load_pages, save_pages, user_files, add_user_file, remove_user_file, chat, add_chat, cached, cache |
 
 ## static/index.html
 | Class | Where | Methods |
 |---|---|---|
-| SpeechService «Service» | `const SpeechService` (line 782) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
+| SpeechService «Service» | `const SpeechService` (line 801) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
 
 ## app.py (web routes that use the classes)
 | Use case | Route | Code used |
 |---|---|---|
-| Register / Login with Google | POST /api/login | AuthService.authenticateWithGoogle |
+| Register / Login with Google | GET /api/config, POST /api/login `{credential}` | AuthService.authenticateWithGoogle (INSTRUCTOR_EMAILS, ALLOWED_EMAIL_DOMAIN), AuthService.restore |
 | Upload Course File | POST /api/files | User.uploadFile → CourseFile.validate, LLMService.processFile → CourseFile.encrypt |
 | Summarize Content | POST /api/files/<id>/summary (max 15 pages per call; the page sends bigger ranges in parts) | LLMService.summarize |
-| **NEW** Delete Uploaded File | DELETE /api/files/<id> | removes the CourseFile and its Summaries |
+| **NEW** Delete Uploaded File | DELETE /api/files/<id> | removes the CourseFile from the user's list and their chat for it |
+| **NEW** Reuse saved results | POST summary / translate | store.Store.cached / cache (by file SHA-256) |
+| **NEW** Private tutor chat history | GET /api/files/<id>/chat | store.Store.chat / add_chat (per user) |
 | Translate Summary | POST /api/summaries/<id>/translate | LLMService.translateSummary |
 | Translate Selected Part | POST /api/files/<id>/translate | LLMService.translatePart |
 | Ask AI Tutor (+ reject unrelated) | POST /api/files/<id>/ask | Student.askTutor → LLMService.answer, NOT_RELATED check |

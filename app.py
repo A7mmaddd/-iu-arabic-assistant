@@ -1,17 +1,27 @@
-import os
+import os, hashlib, time
+from datetime import timedelta
 from flask import Flask, request, jsonify, session, send_from_directory
 from models import *
 from services import AuthService, LLMService
+from store import Store, file_hash
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = os.getenv("SECRET_KEY", "change-me")
-app.config["MAX_CONTENT_LENGTH"] = CourseFile.MAX
-auth, ai = AuthService(), LLMService()
-FILES, SUMMARIES, QUIZZES, EXAMS = {}, {}, {}, {}      # in-memory only (no DB in the class diagram)
+app.config.update(MAX_CONTENT_LENGTH=CourseFile.MAX, PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+                  SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=bool(os.getenv("RENDER")))
+auth, ai, db = AuthService(), LLMService(), Store()
+FILES, SUMMARIES, QUIZZES, EXAMS = {}, {}, {}, {}      # working copies in memory; files/summaries/chats are also in the DB
 PUBLISHED = {}                                         # join code -> published Exam
 MESSAGES = {}                                          # ChatMessage id -> ChatMessage (for replies)
+CACHE_V = "v2"   # change this when the summary/translation prompts change, so old saved results are not reused
 
-def me(): return auth.validateSession(session.get("t"))
+def me():
+    if auth.clientId and not session.get("google"): return None   # a demo-login session is not accepted once Google is on
+    u = auth.validateSession(session.get("t"))
+    if u or not session.get("email"): return u
+    r = auth.restore(session.get("name"), session["email"], session.get("role"))   # server restarted -> sign back in
+    if not r: return None
+    session["t"] = r[0]; return r[1]
 def err(m, c=400): return jsonify(error=m), c
 def own(fid):
     f, u = FILES.get(fid), me()
@@ -35,12 +45,19 @@ def locked(): return open_attempt(me())[0] is not None
 @app.get("/")
 def index(): return send_from_directory("static", "index.html")
 
+@app.get("/api/config")
+def config():
+    """What the login page needs: the Google client ID (public) and whether the user may pick their role."""
+    return jsonify(googleClientId=auth.clientId or None, chooseRole=not auth.fixedRoles)
+
 @app.post("/api/login")
 def login():
     j = request.json or {}
-    r = auth.authenticateWithGoogle(j.get("credential"), j.get("name"), j.get("email"), j.get("role", "student"))
-    if not r: return err("Login failed", 401)
-    session["t"] = r[0]; return jsonify(name=r[1].name, role=r[1].role)
+    try: token, u = auth.authenticateWithGoogle(j.get("credential"), j.get("name"), j.get("email"), j.get("role", "student"))
+    except PermissionError as e: return err(str(e), 401)
+    session.clear(); session.permanent = True
+    session.update(t=token, email=u.email, name=u.name, role=u.role, google=bool(auth.clientId))
+    return jsonify(name=u.name, role=u.role)
 
 @app.post("/api/logout")
 def logout():
@@ -52,37 +69,72 @@ def logout():
 def status():
     """Shows if the AI key reached the server (never shows the key itself)."""
     names = sorted(k for k in os.environ if "GEMINI" in k.upper() or "API_KEY" in k.upper() or "COMET" in k.upper())
-    return jsonify(aiReady=ai.client is not None, model=ai.LLMService, models=ai.models, keyNamesSeen=names)
+    return jsonify(aiReady=ai.client is not None, model=ai.LLMService, models=ai.models, keyNamesSeen=names,
+                   database=db.enabled, databaseError=db.error or None, googleSignIn=bool(auth.clientId))
 
 @app.get("/api/me")
 def whoami():
     u = me(); return jsonify(name=u.name, role=u.role) if u else err("no session", 401)
 
+def file_id(email, h):
+    """Same user + same file -> same id, also after a restart (keeps their chat linked to the file)."""
+    return hashlib.sha256(f"{email}|{h}".encode()).hexdigest()[:12]
+
+def add_file(u, h, name, texts):
+    f = CourseFile(name, 1, u.email)
+    f.id, f.hash = file_id(u.email, h), h
+    f.pages = [Page(i + 1, t) for i, t in enumerate(texts)]
+    FILES[f.id] = f
+    if f not in u.files: u.files.append(f)
+    return f
+
+def load_my_files(u):
+    """After a restart the user's file list comes back from the database (page text is shared by file hash)."""
+    if getattr(u, "_loaded", False): return
+    u._loaded = True
+    for h, info in db.user_files(u.email):
+        if file_id(u.email, h) in FILES: continue
+        texts = db.load_pages(h)
+        if texts is not None: add_file(u, h, info.get("name", "file"), texts)
+
+def file_json(f): return dict(id=f.id, name=f.fileName, pages=len(f.pages))
+
 @app.route("/api/files", methods=["GET", "POST"])
 def files():
     u = me()
     if not u: return err("Login first", 401)
+    load_my_files(u)
     if request.method == "GET":
-        return jsonify([dict(id=f.id, name=f.fileName, pages=len(f.pages)) for f in FILES.values() if f.owner == u.email])
+        return jsonify([file_json(f) for f in FILES.values() if f.owner == u.email])
     up = request.files.get("file")
     if not up: return err("No file")
-    raw = up.read(); f = CourseFile(up.filename, len(raw), u.email)
-    if not u.uploadFile(f): return err("Only PDF/PPT/PPTX up to 300 MB are accepted")
-    f.raw = raw
-    try: ai.processFile(f)
-    except Exception as e:
-        u.files.remove(f); return err(f"Could not read the file: {e}")
-    FILES[f.id] = f; return jsonify(id=f.id, name=f.fileName, pages=len(f.pages))
+    raw = up.read(); check = CourseFile(up.filename, len(raw), u.email)
+    if not check.validate(): return err("Only PDF/PPT/PPTX up to 300 MB are accepted")
+    h = file_hash(raw)
+    if file_id(u.email, h) in FILES: return jsonify(file_json(FILES[file_id(u.email, h)]))   # uploaded again
+    texts = db.load_pages(h)                         # someone already uploaded this exact file -> no need to read it
+    if texts is None:
+        check.raw = raw
+        try: ai.processFile(check)
+        except Exception as e: return err(f"Could not read the file: {e}")
+        texts = [p.text for p in check.pages]
+        db.save_pages(h, up.filename, check.fileType, texts)
+    f = add_file(u, h, up.filename, texts)
+    db.add_user_file(u.email, h, up.filename, len(texts))
+    return jsonify(file_json(f))
 
 @app.delete("/api/files/<fid>")
 def delete_file(fid):
-    """Delete a file uploaded by mistake (and its summaries). Published exams keep their own copy of the questions."""
+    """Delete a file uploaded by mistake: it leaves this user's list and their chat for it is deleted.
+    Saved summaries stay (they are shared by everyone who uploads the same file). Published exams keep their questions."""
     if locked(): return err(EXAM_LOCK, 423)
     f, u = own(fid), me()
     if not f: return err("Not found", 404)
     FILES.pop(fid, None)
     if f in u.files: u.files.remove(f)
     for s in f.summaries: SUMMARIES.pop(s.id, None)
+    for k in [k for k, m in MESSAGES.items() if getattr(m, "fileId", None) == fid]: MESSAGES.pop(k)
+    db.remove_user_file(u.email, f.hash)
     return jsonify(ok=True)
 
 def page_range(f, j):
@@ -101,27 +153,49 @@ def summary(fid):
     j = request.json or {}
     frm = max(1, int(j.get("from", 1)))
     to = min(int(j.get("to", len(f.pages))), frm + MAX_SUMMARY_PAGES - 1, len(f.pages))
-    s = ai.summarize(f, frm, to)
-    if s.coverage.get("failedPages") and not s.coverage.get("coveredPages"):   # AI failed for every page -> let the page offer "Try again"
-        f.summaries.remove(s)
-        return err("The AI is busy right now (Google servers or free-tier limit). Please try again in a minute.", 503)
+    key = f"{CACHE_V}-{ai._lang(f, frm, to)}-{frm}-{to}"
+    hit = db.cached(f.hash, "summaries", key)       # same file + same pages summarized before -> no AI call
+    if hit:
+        s = Summary(hit["bulletPoints"], hit["keyTerms"], frm, to, sections=hit["sections"], coverage=hit["coverage"])
+        f.summaries.append(s)
+    else:
+        s = ai.summarize(f, frm, to)
+        if s.coverage.get("failedPages") and not s.coverage.get("coveredPages"):   # AI failed for every page -> page offers "Try again"
+            f.summaries.remove(s)
+            return err("The AI is busy right now (Google servers or free-tier limit). Please try again in a minute.", 503)
+        c = s.coverage
+        if ai.client and not c.get("failedPages") and c.get("coveredPages"):     # only complete results are shared
+            db.cache(f.hash, "summaries", key, dict(bulletPoints=s.bulletPoints, keyTerms=s.keyTerms,
+                                                     sections=s.sections, coverage=c))
+    s.fileHash, s.cacheKey = f.hash, key
     SUMMARIES[s.id] = s
     return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections,
-                   coverage=s.coverage, pageFrom=frm, pageTo=to)
+                   coverage=s.coverage, pageFrom=frm, pageTo=to, cached=bool(hit))
+
+def cached_text(h, key, make):
+    """Translation saved in the database by file hash; made by the AI only the first time."""
+    hit = db.cached(h, "translations", key) if h else None
+    if hit: return hit["text"]
+    text = make()
+    if h and ai.client and text.strip() and not text.startswith("[DEMO"): db.cache(h, "translations", key, {"text": text})
+    return text
 
 @app.post("/api/summaries/<sid>/translate")
 def tr_summary(sid):
     if locked(): return err(EXAM_LOCK, 423)
     s = SUMMARIES.get(sid)
-    return jsonify(text=ai.translateSummary(s).translatedText) if s else err("Not found", 404)
+    if not s: return err("Not found", 404)
+    key = f"summary-{getattr(s, 'cacheKey', s.id)}"
+    return jsonify(text=cached_text(getattr(s, "fileHash", None), key, lambda: ai.translateSummary(s).translatedText))
 
 @app.post("/api/files/<fid>/translate")
 def tr_part(fid):
     if locked(): return err(EXAM_LOCK, 423)
     f = own(fid)
     if not f: return err("Not found", 404)
-    j = request.json or {}
-    return jsonify(text=ai.translatePart(f, int(j.get("from", 1)), int(j.get("to", len(f.pages)))).translatedText)
+    frm, to = page_range(f, request.json or {})
+    key = f"{CACHE_V}-pages-{frm}-{to}"
+    return jsonify(text=cached_text(f.hash, key, lambda: ai.translatePart(f, frm, to).translatedText))
 
 @app.post("/api/files/<fid>/ask")
 def ask(fid):
@@ -132,7 +206,7 @@ def ask(fid):
     j = request.json or {}; q = (j.get("q") or "").strip()
     if not q: return err("Write a question first.")
     rt = MESSAGES.get(j.get("replyTo") or "")
-    if rt and rt.role != "ai": rt = None
+    if rt and (rt.role != "ai" or getattr(rt, "fileId", None) != fid): rt = None   # only this user's chat for this file
     if isinstance(u, Student):
         reply = (u.askByVoice if j.get("voice") else u.askTutor)(ai, f, q, rt)
         mine = reply.replyTo
@@ -141,8 +215,23 @@ def ask(fid):
         text = ai.answer(f, q, rt.thread() if rt else [])
         if text.strip() == "NOT_RELATED": text = "This question is not related to your uploaded file, so I can't answer it."
         reply = ChatMessage("ai", text, mine)
-    MESSAGES[mine.id] = mine; MESSAGES[reply.id] = reply
+    for m in (mine, reply): m.fileId = fid; MESSAGES[m.id] = m
+    if not reply.text.startswith("[DEMO"):
+        db.add_chat(u.email, f.hash, dict(mine.to_dict(), at=time.time()), dict(reply.to_dict(), at=time.time()))
     return jsonify(answer=reply.text, id=reply.id, question=mine.to_dict())
+
+@app.get("/api/files/<fid>/chat")
+def chat_history(fid):
+    """This user's own saved chat for this file (nobody else's)."""
+    f, u = own(fid), me()
+    if not f: return err("Not found", 404)
+    out, objs = [], {}
+    for d in db.chat(u.email, f.hash):
+        m = MESSAGES.get(d["id"]) or ChatMessage(d["role"], d["text"], objs.get(d.get("replyTo")))
+        m.id, m.fileId = d["id"], fid
+        objs[m.id] = MESSAGES[m.id] = m             # rebuilt so "reply to this answer" still works after a restart
+        out.append(m.to_dict())
+    return jsonify(out)
 
 @app.post("/api/files/<fid>/quiz")
 def quiz(fid):

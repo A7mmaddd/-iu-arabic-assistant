@@ -5,19 +5,54 @@ from concurrent.futures import ThreadPoolExecutor
 from models import *
 
 class AuthService:
-    def __init__(self): self.sessions = {}
+    """Google sign-in. Settings (Render -> Environment):
+       GOOGLE_CLIENT_ID      turns on real Google sign-in (and turns the demo login off)
+       INSTRUCTOR_EMAILS     comma list; if set, only these e-mails are instructors, everyone else is a student
+       ALLOWED_EMAIL_DOMAIN  comma list like iu.edu.sa; if set, only these e-mail domains can sign in"""
+    def __init__(self): self.sessions, self.users = {}, {}
+
+    @staticmethod
+    def _list(name): return [x.strip().lower() for x in os.getenv(name, "").split(",") if x.strip()]
+    @property
+    def clientId(self): return os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    @property
+    def fixedRoles(self): return bool(self._list("INSTRUCTOR_EMAILS"))
+
+    def roleFor(self, email, wanted):
+        if self.fixedRoles: return "instructor" if email in self._list("INSTRUCTOR_EMAILS") else "student"
+        return "instructor" if wanted == "instructor" else "student"
+
+    def domainOk(self, email):
+        doms = self._list("ALLOWED_EMAIL_DOMAIN")
+        return not doms or email.rsplit("@", 1)[-1] in [d.lstrip("@") for d in doms]
+
+    def _session(self, name, email, role):
+        u = self.users.get(email)
+        if not u or u.role != role:                 # same e-mail -> same User object (keeps their files and exams)
+            u = (Instructor if role == "instructor" else Student)(name or email, email); self.users[email] = u
+        u.loginWithGoogle(); token = new_id() + new_id()
+        self.sessions[token] = u; return token, u
+
     def authenticateWithGoogle(self, credential=None, name=None, email=None, role="student"):
-        cid = os.getenv("GOOGLE_CLIENT_ID")
-        if cid and credential:                      # real Google sign-in
+        """Returns (token, user). Raises PermissionError with a message the page can show."""
+        if self.clientId:                           # real Google sign-in only
+            if not credential: raise PermissionError("Please sign in with Google.")
             from google.oauth2 import id_token
             from google.auth.transport import requests as r
-            info = id_token.verify_oauth2_token(credential, r.Request(), cid)
+            try: info = id_token.verify_oauth2_token(credential, r.Request(), self.clientId)
+            except ValueError: raise PermissionError("Google sign-in could not be verified. Please try again.")
+            if not info.get("email_verified"): raise PermissionError("Your Google e-mail is not verified.")
             name, email = info.get("name"), info["email"]
-        elif cid or not email:                      # no demo login when Google is configured
-            return None
-        user = (Instructor if role == "instructor" else Student)(name or email, email)
-        user.loginWithGoogle(); token = new_id() + new_id()
-        self.sessions[token] = user; return token, user
+        elif not email: raise PermissionError("Write your e-mail.")       # demo login (no GOOGLE_CLIENT_ID)
+        email = email.strip().lower()
+        if not self.domainOk(email): raise PermissionError("Please sign in with your university e-mail.")
+        return self._session(name, email, self.roleFor(email, role))
+
+    def restore(self, name, email, role):
+        """Signs the user back in from their (signed) session cookie, e.g. after the server restarted."""
+        if not email or not self.domainOk(email): return None
+        return self._session(name, email, self.roleFor(email, role))
+
     def validateSession(self, token): return self.sessions.get(token)
 
 class AIService(ABC):

@@ -399,16 +399,21 @@ select{cursor:pointer}
     <form class="card" id="lf" novalidate>
       <h2 data-i18n="welcome"></h2>
       <p class="mut" style="margin:0" data-i18n="signin"></p>
+      <div id="demoF">
       <label class="f" for="n" data-i18n="name"></label><input id="n" type="text" autocomplete="name">
       <label class="f" for="e" data-i18n="email"></label><input id="e" type="email" autocomplete="email" dir="ltr">
+      </div>
+      <div id="roleF">
       <label class="f" data-i18n="iam"></label>
       <div class="seg" role="radiogroup">
         <label><input type="radio" name="role" value="student" checked><svg class="i"><use href="#i-user"/></svg><span data-i18n="student"></span></label>
         <label><input type="radio" name="role" value="instructor"><svg class="i"><use href="#i-cap"/></svg><span data-i18n="instructor"></span></label>
       </div>
+      </div>
       <button class="go" id="lb" type="submit"><span data-i18n="login"></span></button>
+      <div id="gbtn" class="hide" style="display:flex;justify-content:center;margin-top:18px;min-height:44px"></div>
       <div id="lerr"></div>
-      <p class="mut note" data-i18n="demoNote"></p>
+      <p class="mut note" id="dnote" data-i18n="demoNote"></p>
     </form>
   </section>
 </div>
@@ -508,7 +513,7 @@ en:{
  appName:'IU Arabic Courses Assistant',tagline:'Summaries, translation, tutoring and quizzes for your course files.',
  unofficial:'Student project – unofficial',f1:'Short, simple summaries',f2:'Translate pages into English',f3:'AI tutor that answers from your file',f4:'Quizzes to test yourself',
  welcome:'Welcome',signin:'Sign in to continue',name:'Name',email:'Email',iam:'I am a',student:'Student',instructor:'Instructor',login:'Log in',
- demoNote:'Demo login. Google sign-in is used when GOOGLE_CLIENT_ID is set.',theme:'Light / dark',language:'Language',logout:'Log out',files:'My files',
+ gErr:'Google sign-in could not load. Check your internet and refresh the page.',demoNote:'Demo login. Google sign-in is used when GOOGLE_CLIENT_ID is set.',theme:'Light / dark',language:'Language',logout:'Log out',files:'My files',
  upload:'Upload PDF or PowerPoint',uploadHint:'Drop a file here or click · PDF, PPT, PPTX · up to 300 MB',dropHere:'Drop your file here',
  myFiles:'My files',noFiles:'No files yet. Upload a PDF or PowerPoint to start.',pagesN:n=>n+(n===1?' page':' pages'),
  noFileSel:'No file selected',pagesLbl:'Pages',to:'to',all:'All',of:n=>'of '+n,
@@ -556,7 +561,7 @@ ar:{
  appName:'IU Arabic Courses Assistant',tagline:'تلخيص وترجمة ومعلّم ذكي واختبارات لملفات مقرراتك.',
  unofficial:'مشروع طلابي – غير رسمي',f1:'ملخصات قصيرة وسهلة',f2:'ترجمة الصفحات إلى الإنجليزية',f3:'معلّم ذكي يجيب من ملفك فقط',f4:'اختبارات لتقيس مستواك',
  welcome:'أهلًا بك',signin:'سجّل الدخول للمتابعة',name:'الاسم',email:'البريد الإلكتروني',iam:'أنا',student:'طالب',instructor:'مدرّس',login:'تسجيل الدخول',
- demoNote:'دخول تجريبي. يُستخدم تسجيل الدخول عبر Google عند ضبط GOOGLE_CLIENT_ID.',theme:'فاتح / داكن',language:'اللغة',logout:'تسجيل الخروج',files:'ملفاتي',
+ gErr:'تعذّر تحميل تسجيل الدخول عبر Google. تحقق من الإنترنت ثم حدّث الصفحة.',demoNote:'دخول تجريبي. يُستخدم تسجيل الدخول عبر Google عند ضبط GOOGLE_CLIENT_ID.',theme:'فاتح / داكن',language:'اللغة',logout:'تسجيل الخروج',files:'ملفاتي',
  upload:'رفع ملف PDF أو PowerPoint',uploadHint:'اسحب الملف هنا أو اضغط · PDF و PPT و PPTX · حتى 300 ميغابايت',dropHere:'أفلت الملف هنا',
  myFiles:'ملفاتي',noFiles:'لا توجد ملفات بعد. ارفع ملف PDF أو PowerPoint للبدء.',pagesN:n=>n+' صفحة',
  noFileSel:'لم يتم اختيار ملف',pagesLbl:'الصفحات',to:'إلى',all:'الكل',of:n=>'من '+n,
@@ -672,7 +677,19 @@ $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#lb');b.disabled=true;
   const lab=b.firstElementChild;b.prepend(h('span',{class:'spin'}));
   try{enter(await api('/api/login','POST',{name:$('#n').value.trim(),email:$('#e').value.trim(),role:$('#lf input[name=role]:checked').value}))}
   catch(x){put('#lerr',fail(x))}finally{b.disabled=false;b.querySelector('.spin')?.remove()}};
-$('#lo').onclick=async()=>{try{await api('/api/logout','POST')}catch{}location.reload()};
+$('#lo').onclick=async()=>{try{await api('/api/logout','POST')}catch{}try{google.accounts.id.disableAutoSelect()}catch{}location.reload()};
+/* Google sign-in: shown when the server has GOOGLE_CLIENT_ID; the demo form is hidden then */
+function setupLogin(c){S.cfg=c;$('#roleF').classList.toggle('hide',!c.chooseRole);
+  if(!c.googleClientId)return;
+  ['#demoF','#lb','#dnote'].forEach(x=>$(x).classList.add('hide'));
+  const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
+  s.onload=()=>{google.accounts.id.initialize({client_id:c.googleClientId,callback:gLogin,ux_mode:'popup'});
+    google.accounts.id.renderButton($('#gbtn'),{theme:'filled_blue',size:'large',shape:'pill',text:'signin_with',locale:L,width:300});
+    $('#gbtn').classList.remove('hide')};
+  s.onerror=()=>put('#lerr',fail(t('gErr')));document.head.append(s)}
+async function gLogin(r){put('#lerr');
+  try{enter(await api('/api/login','POST',{credential:r.credential,role:$('#lf input[name=role]:checked').value}))}
+  catch(x){put('#lerr',fail(x))}}
 function setWho(){const u=S.user;$('#who').textContent=u.name;$('#who').title=u.name;$('#role').textContent=t(u.role==='instructor'?'instructor':'student');
   $('#av').textContent=(u.name||'?').trim().charAt(0)||'?'}
 function enter(u){S.user=u;$('#login').classList.add('hide');$('#app').classList.remove('hide');setWho();
@@ -692,8 +709,9 @@ async function delFile(f){if(!confirm(t('delAsk',f.name)))return;
     await loadFiles();toast(t('deleted'),'ok')}catch(x){toast(x,'err')}}
 function resetOutputs(){S.sid=null;S.sids=[];S.quiz=null;$('#btrs').disabled=true;setReply(null);SpeechService.stopSpeaking();
   ['#o-sum','#o-sum2','#o-tr','#o-qz','#chat'].forEach(i=>put(i));drawTutorEmpty()}
-function pick(id){S.fid=id;const f=cur();
-  if(S.last!==undefined&&S.last!==id)resetOutputs();S.last=id;
+function pick(id){S.fid=id;const f=cur();const changed=S.last!==id;
+  if(S.last!==undefined&&changed)resetOutputs();S.last=id;
+  if(changed&&id)loadChat(id);
   setTitle();
   updateBanner();
   if(f){const m=Math.max(1,f.pages);$('#a').max=$('#b').max=m;
@@ -816,11 +834,18 @@ function speakBtn(text){const b=h('button',{type:'button'},ic('speaker'),h('span
   b.addEventListener('stopped',idle);return b}
 function aiActions(m){return h('div',{class:'acts'},speakBtn(m.text),
   h('button',{type:'button',onclick:()=>setReply(m)},ic('reply'),h('span',{},t('reply'))))}
+const meRow=(q,quoted)=>h('div',{class:'mrow me'},h('div',{class:'av'},(S.user?.name||'?').trim().charAt(0).toUpperCase()),
+  h('div',{class:'msg',dir:'auto'},quoted?h('span',{class:'quote',dir:'auto'},short(quoted,90)):'',q));
+const aiRow=m=>h('div',{class:'mrow ai'},h('div',{class:'av'},ic('spark')),
+  h('div',{class:'mcol'},h('div',{class:'msg',dir:'auto'},rich(m.text)),aiActions(m)));
+/* The student's own saved chat for this file (from the database) */
+async function loadChat(fid){let ms=[];try{ms=await api(`/api/files/${fid}/chat`)}catch{return}
+  if(S.fid!==fid||!ms.length)return;const c=$('#chat');c.querySelector('.tuempty')?.remove();
+  c.prepend(...ms.map(m=>m.role==='ai'?aiRow(m):meRow(m.text,m.quoted)))}
 async function ask(text,opt={}){if(!ready()||S.busyAsk)return;const q=(text??$('#q').value).trim();if(!q)return;$('#q').value='';
   const rt=S.replyTo;setReply(null);SpeechService.stopSpeaking();
   const c=$('#chat');c.querySelector('.tuempty')?.remove();
-  c.append(h('div',{class:'mrow me'},h('div',{class:'av'},(S.user?.name||'?').trim().charAt(0).toUpperCase()),
-    h('div',{class:'msg',dir:'auto'},rt?h('span',{class:'quote',dir:'auto'},short(rt.text,90)):'',q)));
+  c.append(meRow(q,rt?.text));
   const dots=h('div',{class:'msg',dir:'auto'},h('span',{class:'dots'},h('i'),h('i'),h('i')));
   const col=h('div',{class:'mcol'},dots);
   const w=h('div',{class:'mrow ai'},h('div',{class:'av'},ic('spark')),col);c.append(w);toEnd();
@@ -1064,5 +1089,6 @@ async function submitTake(){const ans=takeAnswers(),miss=ans.filter(a=>!a).lengt
 
 /* ---------- boot ---------- */
 applyTheme();applyLang();
+api('/api/config').then(setupLogin).catch(()=>{});
 api('/api/me').then(enter).catch(()=>{}).finally(()=>document.body.classList.remove('boot'));
 </script></body></html>

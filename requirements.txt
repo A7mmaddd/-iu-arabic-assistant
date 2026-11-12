@@ -5,3 +5,5 @@ pypdf
 python-pptx
 google-auth
 gunicorn
+firebase-admin
+requests

@@ -6,6 +6,7 @@ Python 3.10+ / Flask. Run:
     export GOOGLE_CLIENT_ID=...         # optional; without it a demo login is shown
     python app.py                       # http://127.0.0.1:5000
 Files: models.py (class diagram classes), services.py (AuthService, AIService, LLMService), app.py (web routes),
+store.py (Firestore database),
 static/index.html (UI + SpeechService). MAPPING.md shows where every class and use case is in the code.
 
 ## Features
@@ -23,3 +24,10 @@ see results with the most-missed questions and how many times each student left 
 4. Open the https://....onrender.com link. That's it.
 Note: the free plan sleeps after ~15 min idle (first visit takes ~1 min) and
 uploaded files / exams are kept in memory, so they reset when it sleeps or redeploys.
+
+## Database (Firebase / Cloud Firestore)
+- The same file uploaded by different students is recognised by its SHA-256 hash: its text, summaries and
+  translations are saved once and reused (no new AI call). Quizzes and exam questions are always made fresh.
+- Each user's file list and AI-tutor chat are saved under that user only; nobody else can read their chat.
+- Without FIREBASE_CREDENTIALS everything still works, but only in memory (resets when the server restarts).
+- Never put the Firebase key file on GitHub (`firebase-key.json` is in .gitignore).
