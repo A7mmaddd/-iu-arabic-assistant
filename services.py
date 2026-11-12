@@ -4,23 +4,50 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from models import *
 
+class ProfileError(ValueError):
+    """A problem in the first-login form. code -> the message the page shows (Arabic/English)."""
+    def __init__(self, code, msg): super().__init__(msg); self.code = code
+
 class AuthService:
-    """Google sign-in. Settings (Render -> Environment):
+    """Google sign-in + the first-login profile. Settings (Render -> Environment):
        GOOGLE_CLIENT_ID      turns on real Google sign-in (and turns the demo login off)
-       INSTRUCTOR_EMAILS     comma list; if set, only these e-mails are instructors, everyone else is a student
-       ALLOWED_EMAIL_DOMAIN  comma list like iu.edu.sa; if set, only these e-mail domains can sign in"""
+       INSTRUCTOR_EMAILS     optional comma list of Google e-mails; if set, a 6-digit staff number is only
+                             accepted from these accounts (stops students from typing a fake staff number)
+       ALLOWED_EMAIL_DOMAIN  optional comma list of domains for the Google account (e.g. gmail.com,iu.edu.sa)
+    Role comes from the number on the profile: 9 digits = university (student) number, 6 digits = staff number."""
+    STUDENT_ID_LEN, STAFF_ID_LEN = 9, 6
+    STUDENT_DOMAIN, STAFF_DOMAIN = "stu.iu.edu.sa", "iu.edu.sa"
+    DEFAULT_UNIVERSITY = "الجامعة الإسلامية"
+
     def __init__(self): self.sessions, self.users = {}, {}
 
     @staticmethod
     def _list(name): return [x.strip().lower() for x in os.getenv(name, "").split(",") if x.strip()]
     @property
     def clientId(self): return os.getenv("GOOGLE_CLIENT_ID", "").strip()
-    @property
-    def fixedRoles(self): return bool(self._list("INSTRUCTOR_EMAILS"))
 
-    def roleFor(self, email, wanted):
-        if self.fixedRoles: return "instructor" if email in self._list("INSTRUCTOR_EMAILS") else "student"
-        return "instructor" if wanted == "instructor" else "student"
+    @classmethod
+    def roleFromId(cls, uid):
+        if not uid.isdigit(): return None
+        return {cls.STUDENT_ID_LEN: "student", cls.STAFF_ID_LEN: "instructor"}.get(len(uid))
+
+    def checkProfile(self, googleEmail, j):
+        """Validates the first-login form. Returns the profile to save, or raises ProfileError."""
+        name = " ".join(str(j.get("name") or "").split())[:80]
+        uid = "".join(str(j.get("universityId") or "").split()).translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+        uemail = str(j.get("universityEmail") or "").strip().lower()
+        uni = " ".join(str(j.get("university") or "").split())[:100] or self.DEFAULT_UNIVERSITY
+        if not name: raise ProfileError("name", "Write your name.")
+        role = self.roleFromId(uid)
+        if not role: raise ProfileError("uid", "The university number is 9 digits; the staff number is 6 digits.")
+        if uemail:
+            want = self.STUDENT_DOMAIN if role == "student" else self.STAFF_DOMAIN
+            if not uemail.endswith("@" + want):
+                raise ProfileError("uemail_" + role, f"A {role} university e-mail ends with @{want}.")
+        staff = self._list("INSTRUCTOR_EMAILS")
+        if role == "instructor" and staff and googleEmail not in staff:
+            raise ProfileError("staff", "This Google account is not on the staff list. Please contact the administrator.")
+        return dict(name=name, universityId=uid, role=role, universityEmail=uemail, university=uni)
 
     def domainOk(self, email):
         doms = self._list("ALLOWED_EMAIL_DOMAIN")
@@ -33,8 +60,9 @@ class AuthService:
         u.loginWithGoogle(); token = new_id() + new_id()
         self.sessions[token] = u; return token, u
 
-    def authenticateWithGoogle(self, credential=None, name=None, email=None, role="student"):
-        """Returns (token, user). Raises PermissionError with a message the page can show."""
+    def authenticateWithGoogle(self, credential=None, name=None, email=None):
+        """Checks WHO the person is (Google account). Returns (name, email); the role comes from their profile.
+        Raises PermissionError with a message the page can show."""
         if self.clientId:                           # real Google sign-in only
             if not credential: raise PermissionError("Please sign in with Google.")
             from google.oauth2 import id_token
@@ -46,12 +74,13 @@ class AuthService:
         elif not email: raise PermissionError("Write your e-mail.")       # demo login (no GOOGLE_CLIENT_ID)
         email = email.strip().lower()
         if not self.domainOk(email): raise PermissionError("Please sign in with your university e-mail.")
-        return self._session(name, email, self.roleFor(email, role))
+        return name, email
 
-    def restore(self, name, email, role):
-        """Signs the user back in from their (signed) session cookie, e.g. after the server restarted."""
-        if not email or not self.domainOk(email): return None
-        return self._session(name, email, self.roleFor(email, role))
+    def signIn(self, profile, email):
+        """Starts a session for a user whose profile is complete. Returns (token, user)."""
+        token, u = self._session(profile["name"], email, profile["role"])
+        u.name, u.universityId, u.university = profile["name"], profile["universityId"], profile.get("university", "")
+        return token, u
 
     def validateSession(self, token): return self.sessions.get(token)
 

@@ -403,17 +403,23 @@ select{cursor:pointer}
       <label class="f" for="n" data-i18n="name"></label><input id="n" type="text" autocomplete="name">
       <label class="f" for="e" data-i18n="email"></label><input id="e" type="email" autocomplete="email" dir="ltr">
       </div>
-      <div id="roleF">
-      <label class="f" data-i18n="iam"></label>
-      <div class="seg" role="radiogroup">
-        <label><input type="radio" name="role" value="student" checked><svg class="i"><use href="#i-user"/></svg><span data-i18n="student"></span></label>
-        <label><input type="radio" name="role" value="instructor"><svg class="i"><use href="#i-cap"/></svg><span data-i18n="instructor"></span></label>
-      </div>
-      </div>
       <button class="go" id="lb" type="submit"><span data-i18n="login"></span></button>
       <div id="gbtn" class="hide" style="display:flex;justify-content:center;margin-top:18px;min-height:44px"></div>
       <div id="lerr"></div>
       <p class="mut note" id="dnote" data-i18n="demoNote"></p>
+    </form>
+    <form class="card hide" id="pf" novalidate>
+      <h2 data-i18n="pfTitle"></h2>
+      <p class="mut" style="margin:0" data-i18n="pfSub"></p>
+      <label class="f" for="pn" data-i18n="pfName"></label><input id="pn" type="text" autocomplete="name" maxlength="80" required>
+      <label class="f" for="pid" data-i18n="pfId"></label>
+      <input id="pid" type="text" inputmode="numeric" autocomplete="off" maxlength="12" dir="ltr" required>
+      <p class="mut" style="margin:4px 0 0;font-size:13px"><span data-i18n="pfIdHint"></span> <b id="prole" style="color:var(--brand)"></b></p>
+      <label class="f" for="pue" data-i18n="pfUemail"></label><input id="pue" type="email" autocomplete="email" dir="ltr" placeholder="name@stu.iu.edu.sa">
+      <label class="f" for="puni" data-i18n="pfUni"></label><input id="puni" type="text" maxlength="100">
+      <button class="go" id="pb" type="submit"><span data-i18n="pfSave"></span></button>
+      <div id="perr"></div>
+      <p class="mut note"><a href="#" id="pother" data-i18n="pfOther"></a></p>
     </form>
   </section>
 </div>
@@ -513,6 +519,7 @@ en:{
  appName:'IU Arabic Courses Assistant',tagline:'Summaries, translation, tutoring and quizzes for your course files.',
  unofficial:'Student project – unofficial',f1:'Short, simple summaries',f2:'Translate pages into English',f3:'AI tutor that answers from your file',f4:'Quizzes to test yourself',
  welcome:'Welcome',signin:'Sign in to continue',name:'Name',email:'Email',iam:'I am a',student:'Student',instructor:'Instructor',login:'Log in',
+ pfTitle:'Complete your profile',pfSub:'Only this once. Next time you sign in with this Google account you go straight in.',pfName:'Full name',pfId:'University number or staff number',pfIdHint:'Students: 9 digits · Staff: 6 digits.',pfAsStudent:'→ You will be signed in as a student',pfAsStaff:'→ You will be signed in as an instructor',pfUemail:'University e-mail (optional)',pfUni:'University (optional)',pfSave:'Continue',pfOther:'Use another Google account',e_name:'Please write your name.',e_uid:'The university number is 9 digits and the staff number is 6 digits.',e_uemail_student:'A student university e-mail ends with @stu.iu.edu.sa',e_uemail_instructor:'A staff university e-mail ends with @iu.edu.sa',e_staff:'This Google account is not on the staff list. Please contact the administrator.',e_taken:'This number is already registered with another account.',
  gErr:'Google sign-in could not load. Check your internet and refresh the page.',demoNote:'Demo login. Google sign-in is used when GOOGLE_CLIENT_ID is set.',theme:'Light / dark',language:'Language',logout:'Log out',files:'My files',
  upload:'Upload PDF or PowerPoint',uploadHint:'Drop a file here or click · PDF, PPT, PPTX · up to 300 MB',dropHere:'Drop your file here',
  myFiles:'My files',noFiles:'No files yet. Upload a PDF or PowerPoint to start.',pagesN:n=>n+(n===1?' page':' pages'),
@@ -561,6 +568,7 @@ ar:{
  appName:'IU Arabic Courses Assistant',tagline:'تلخيص وترجمة ومعلّم ذكي واختبارات لملفات مقرراتك.',
  unofficial:'مشروع طلابي – غير رسمي',f1:'ملخصات قصيرة وسهلة',f2:'ترجمة الصفحات إلى الإنجليزية',f3:'معلّم ذكي يجيب من ملفك فقط',f4:'اختبارات لتقيس مستواك',
  welcome:'أهلًا بك',signin:'سجّل الدخول للمتابعة',name:'الاسم',email:'البريد الإلكتروني',iam:'أنا',student:'طالب',instructor:'مدرّس',login:'تسجيل الدخول',
+ pfTitle:'أكمل معلوماتك',pfSub:'مرة واحدة فقط. في المرة القادمة تدخل مباشرة بنفس حساب Google.',pfName:'الاسم الكامل',pfId:'الرقم الجامعي أو الرقم الوظيفي',pfIdHint:'الطالب: 9 أرقام · عضو هيئة التدريس: 6 أرقام.',pfAsStudent:'← سيتم تسجيلك كطالب',pfAsStaff:'← سيتم تسجيلك كعضو هيئة تدريس',pfUemail:'البريد الجامعي (اختياري)',pfUni:'الجامعة (اختياري)',pfSave:'متابعة',pfOther:'استخدام حساب Google آخر',e_name:'فضلاً اكتب اسمك.',e_uid:'الرقم الجامعي 9 أرقام، والرقم الوظيفي 6 أرقام.',e_uemail_student:'البريد الجامعي للطالب ينتهي بـ @stu.iu.edu.sa',e_uemail_instructor:'البريد الجامعي لعضو هيئة التدريس ينتهي بـ @iu.edu.sa',e_staff:'حساب Google هذا غير مسجل ضمن أعضاء هيئة التدريس. فضلاً تواصل مع الإدارة.',e_taken:'هذا الرقم مسجل مسبقًا بحساب آخر.',
  gErr:'تعذّر تحميل تسجيل الدخول عبر Google. تحقق من الإنترنت ثم حدّث الصفحة.',demoNote:'دخول تجريبي. يُستخدم تسجيل الدخول عبر Google عند ضبط GOOGLE_CLIENT_ID.',theme:'فاتح / داكن',language:'اللغة',logout:'تسجيل الخروج',files:'ملفاتي',
  upload:'رفع ملف PDF أو PowerPoint',uploadHint:'اسحب الملف هنا أو اضغط · PDF و PPT و PPTX · حتى 300 ميغابايت',dropHere:'أفلت الملف هنا',
  myFiles:'ملفاتي',noFiles:'لا توجد ملفات بعد. ارفع ملف PDF أو PowerPoint للبدء.',pagesN:n=>n+' صفحة',
@@ -621,7 +629,7 @@ const api=async(u,m='GET',b)=>{const fd=b instanceof FormData;
     const m=raw.match(/<title>([\s\S]*?)<\/title>/i);let msg='';
     if(m){const x=document.createElement('textarea');x.innerHTML=m[1];msg=x.value.replace(/\s*\/\/\s*Werkzeug.*$/i,'').trim().slice(0,400)}
     throw t('srvErr')+(msg?'\n'+msg:'')}
-  if(!r.ok)throw d.error||t('generic');return d};
+  if(!r.ok)throw (d.code&&T.en['e_'+d.code]!=null)?t('e_'+d.code):(d.error||t('generic'));return d};
 
 /* ---------- ui bits ---------- */
 const note=m=>h('div',{class:'empty'},m);
@@ -675,11 +683,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 /* ---------- login / session ---------- */
 $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#lb');b.disabled=true;put('#lerr');
   const lab=b.firstElementChild;b.prepend(h('span',{class:'spin'}));
-  try{enter(await api('/api/login','POST',{name:$('#n').value.trim(),email:$('#e').value.trim(),role:$('#lf input[name=role]:checked').value}))}
+  try{enter(await api('/api/login','POST',{name:$('#n').value.trim(),email:$('#e').value.trim()}))}
   catch(x){put('#lerr',fail(x))}finally{b.disabled=false;b.querySelector('.spin')?.remove()}};
 $('#lo').onclick=async()=>{try{await api('/api/logout','POST')}catch{}try{google.accounts.id.disableAutoSelect()}catch{}location.reload()};
 /* Google sign-in: shown when the server has GOOGLE_CLIENT_ID; the demo form is hidden then */
-function setupLogin(c){S.cfg=c;$('#roleF').classList.toggle('hide',!c.chooseRole);
+function setupLogin(c){S.cfg=c;
   if(!c.googleClientId)return;
   ['#demoF','#lb','#dnote'].forEach(x=>$(x).classList.add('hide'));
   const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
@@ -688,11 +696,29 @@ function setupLogin(c){S.cfg=c;$('#roleF').classList.toggle('hide',!c.chooseRole
     $('#gbtn').classList.remove('hide')};
   s.onerror=()=>put('#lerr',fail(t('gErr')));document.head.append(s)}
 async function gLogin(r){put('#lerr');
-  try{enter(await api('/api/login','POST',{credential:r.credential,role:$('#lf input[name=role]:checked').value}))}
+  try{enter(await api('/api/login','POST',{credential:r.credential}))}
   catch(x){put('#lerr',fail(x))}}
 function setWho(){const u=S.user;$('#who').textContent=u.name;$('#who').title=u.name;$('#role').textContent=t(u.role==='instructor'?'instructor':'student');
   $('#av').textContent=(u.name||'?').trim().charAt(0)||'?'}
-function enter(u){S.user=u;$('#login').classList.add('hide');$('#app').classList.remove('hide');setWho();
+/* First login: name + university/staff number (9 digits = student, 6 = instructor), saved to the Google account */
+const pfDigits=s=>String(s).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s/g,'');
+function pfRole(){const v=pfDigits($('#pid').value),role=/^\d{9}$/.test(v)?'student':/^\d{6}$/.test(v)?'instructor':null;
+  $('#prole').textContent=role?t(role==='student'?'pfAsStudent':'pfAsStaff'):'';return role}
+function showProfile(r){$('#lf').classList.add('hide');$('#pf').classList.remove('hide');put('#perr');
+  if(r.name&&!$('#pn').value)$('#pn').value=r.name;
+  if(!$('#puni').value)$('#puni').value=S.cfg?.defaultUniversity||'الجامعة الإسلامية';pfRole();$('#pn').focus()}
+$('#pid').oninput=pfRole;
+$('#pother').onclick=async e=>{e.preventDefault();try{await api('/api/logout','POST')}catch{}
+  try{google.accounts.id.disableAutoSelect()}catch{}location.reload()};
+$('#pf').onsubmit=async e=>{e.preventDefault();put('#perr');
+  const name=$('#pn').value.trim(),role=pfRole(),ue=$('#pue').value.trim().toLowerCase();
+  if(!name)return put('#perr',fail(t('e_name')));
+  if(!role)return put('#perr',fail(t('e_uid')));
+  if(ue&&!ue.endsWith(role==='student'?'@stu.iu.edu.sa':'@iu.edu.sa'))return put('#perr',fail(t('e_uemail_'+role)));
+  const b=$('#pb');b.disabled=true;
+  try{enter(await api('/api/profile','POST',{name,universityId:pfDigits($('#pid').value),universityEmail:ue,university:$('#puni').value.trim()}))}
+  catch(x){put('#perr',fail(x))}finally{b.disabled=false}};
+function enter(u){if(u.needProfile)return showProfile(u);S.user=u;$('#login').classList.add('hide');$('#app').classList.remove('hide');setWho();
   $('#exTab').classList.toggle('hide',u.role!=='instructor');$('#teTab').classList.toggle('hide',u.role!=='student');loadFiles();loadExams();resumeExam()}
 
 /* ---------- files ---------- */

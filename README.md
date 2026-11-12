@@ -3,7 +3,10 @@ Python 3.10+ / Flask. Run:
     pip install -r requirements.txt
     export GEMINI_API_KEY=...           # from aistudio.google.com; without it the AI replies in demo mode
     export LLM_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash   # optional; this is the default
-    export GOOGLE_CLIENT_ID=...         # optional; without it a demo login is shown
+    export GOOGLE_CLIENT_ID=...         # optional; Google sign-in (without it a demo login is shown)
+    export FIREBASE_CREDENTIALS='{...}' # optional; Firestore database (or put firebase-key.json in this folder)
+    export INSTRUCTOR_EMAILS=a@x,b@x    # optional; only these Google accounts may register a 6-digit staff number
+    export ALLOWED_EMAIL_DOMAIN=...     # optional; only these Google-account domains can sign in
     python app.py                       # http://127.0.0.1:5000
 Files: models.py (class diagram classes), services.py (AuthService, AIService, LLMService), app.py (web routes),
 store.py (Firestore database),
@@ -22,8 +25,14 @@ see results with the most-missed questions and how many times each student left 
 2. On render.com: New + -> Blueprint -> pick the repo.
 3. Paste your Gemini API key (from Google AI Studio) when Render asks for GEMINI_API_KEY, then Apply.
 4. Open the https://....onrender.com link. That's it.
-Note: the free plan sleeps after ~15 min idle (first visit takes ~1 min) and
-uploaded files / exams are kept in memory, so they reset when it sleeps or redeploys.
+Note: the free plan sleeps after ~15 min idle (first visit takes ~1 min). With FIREBASE_CREDENTIALS set,
+profiles, files, summaries, translations and chats are kept in the database; quizzes and exams are still in memory.
+
+## First login (profile)
+After Google sign-in, a new user fills a short form once: full name (required), university/staff number
+(required: 9 digits = student, 6 digits = instructor), university e-mail (optional: students @stu.iu.edu.sa,
+staff @iu.edu.sa) and university (optional, default "الجامعة الإسلامية"). It is saved to their Google account,
+so the next sign-in goes straight in. One number can only be registered by one Google account.
 
 ## Database (Firebase / Cloud Firestore)
 - The same file uploaded by different students is recognised by its SHA-256 hash: its text, summaries and

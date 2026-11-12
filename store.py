@@ -7,6 +7,8 @@ What is saved:
   files/{fileHash}/translations/{key}   translations -> same
   users/{userKey}/files/{fileHash}      the files a user uploaded (their list)
   users/{userKey}/chats/{fileHash}      that user's AI-tutor chat for that file (private: only read for that user)
+  users/{userKey}/profile/info          name, university/staff number, role, university e-mail, university
+  ids/{hash of number}                  which account uses a university/staff number (one number = one account)
 
 Quizzes and exam questions are NOT saved here: they are made fresh every time.
 Without FIREBASE_CREDENTIALS the app keeps everything in memory (works, but resets on restart).
@@ -109,6 +111,22 @@ class Store:
         for i, c in enumerate(chunks): self.set(f"files/{h}/chunks/{i:04d}", {"pages": c})
         self.set(f"files/{h}", {"name": name, "type": file_type, "pages": len(texts), "chunks": len(chunks),
                                 "savedAt": time.time()})
+
+    # ---- profile (filled once on the first login, linked to the Google account) ----
+    def profile(self, email):
+        return self.get(f"users/{user_key(email)}/profile/info")
+
+    def save_profile(self, email, data):
+        self.set(f"users/{user_key(email)}/profile/info", dict(data, savedAt=time.time()))
+
+    def claim_id(self, uid, email):
+        """One university/staff number = one Google account. False if another account already uses it."""
+        path, me = f"ids/{hashlib.sha256(uid.encode()).hexdigest()[:32]}", user_key(email)
+        with self.lock:
+            cur = self.get(path)
+            if cur and cur.get("user") != me: return False
+            if not cur: self.set(path, {"user": me, "at": time.time()})
+            return True
 
     # ---- a user's own file list ----
     def user_files(self, email):

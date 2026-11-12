@@ -2,7 +2,7 @@ import os, hashlib, time
 from datetime import timedelta
 from flask import Flask, request, jsonify, session, send_from_directory
 from models import *
-from services import AuthService, LLMService
+from services import AuthService, LLMService, ProfileError
 from store import Store, file_hash
 
 app = Flask(__name__, static_folder="static")
@@ -18,10 +18,12 @@ CACHE_V = "v2"   # change this when the summary/translation prompts change, so o
 def me():
     if auth.clientId and not session.get("google"): return None   # a demo-login session is not accepted once Google is on
     u = auth.validateSession(session.get("t"))
-    if u or not session.get("email"): return u
-    r = auth.restore(session.get("name"), session["email"], session.get("role"))   # server restarted -> sign back in
-    if not r: return None
-    session["t"] = r[0]; return r[1]
+    if u or not session.get("email") or not session.get("role"): return u   # no role yet = profile not filled in
+    p = db.profile(session["email"])                                         # server restarted -> sign back in
+    if not p:                                     # e.g. signed in before profiles existed -> ask for the profile
+        session.pop("role", None); session.pop("t", None); return None
+    token, u = auth.signIn(p, session["email"])
+    session["t"] = token; return u
 def err(m, c=400): return jsonify(error=m), c
 def own(fid):
     f, u = FILES.get(fid), me()
@@ -47,17 +49,40 @@ def index(): return send_from_directory("static", "index.html")
 
 @app.get("/api/config")
 def config():
-    """What the login page needs: the Google client ID (public) and whether the user may pick their role."""
-    return jsonify(googleClientId=auth.clientId or None, chooseRole=not auth.fixedRoles)
+    """What the login page needs: the Google client ID (public) and the default university name."""
+    return jsonify(googleClientId=auth.clientId or None, defaultUniversity=auth.DEFAULT_UNIVERSITY)
+
+def signed_in(profile):
+    token, u = auth.signIn(profile, session["email"])
+    session.update(t=token, name=u.name, role=u.role)
+    return jsonify(name=u.name, role=u.role)
+
+def need_profile():
+    return jsonify(needProfile=True, name=session.get("gname") or "", email=session.get("email"))
 
 @app.post("/api/login")
 def login():
+    """Step 1: Google says who the person is. If their profile is saved -> signed in; else the page asks for it."""
     j = request.json or {}
-    try: token, u = auth.authenticateWithGoogle(j.get("credential"), j.get("name"), j.get("email"), j.get("role", "student"))
+    try: name, email = auth.authenticateWithGoogle(j.get("credential"), j.get("name"), j.get("email"))
     except PermissionError as e: return err(str(e), 401)
     session.clear(); session.permanent = True
-    session.update(t=token, email=u.email, name=u.name, role=u.role, google=bool(auth.clientId))
-    return jsonify(name=u.name, role=u.role)
+    session.update(email=email, gname=name, google=bool(auth.clientId))
+    p = db.profile(email)
+    return signed_in(p) if p else need_profile()
+
+@app.post("/api/profile")
+def save_profile():
+    """Step 2 (first login only): name + university/staff number (decides student/instructor) + optional details."""
+    if not session.get("email") or (auth.clientId and not session.get("google")): return err("Login first", 401)
+    email, p = session["email"], db.profile(session["email"])
+    if p: return signed_in(p)                       # already saved (e.g. two tabs)
+    try: p = auth.checkProfile(email, request.json or {})
+    except ProfileError as e: return jsonify(error=str(e), code=e.code), 400
+    if not db.claim_id(p["universityId"], email):
+        return jsonify(error="This number is already used by another account.", code="taken"), 400
+    db.save_profile(email, p)
+    return signed_in(p)
 
 @app.post("/api/logout")
 def logout():
@@ -74,7 +99,11 @@ def status():
 
 @app.get("/api/me")
 def whoami():
-    u = me(); return jsonify(name=u.name, role=u.role) if u else err("no session", 401)
+    u = me()
+    if u: return jsonify(name=u.name, role=u.role)
+    if session.get("email") and not session.get("role") and not (auth.clientId and not session.get("google")):
+        return need_profile()                       # signed in with Google but the first-login form is not done yet
+    return err("no session", 401)
 
 def file_id(email, h):
     """Same user + same file -> same id, also after a restart (keeps their chat linked to the file)."""

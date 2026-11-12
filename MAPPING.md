@@ -20,24 +20,25 @@
 ## services.py
 | Class | Line | Methods (line) |
 |---|---|---|
-| AuthService | 7 | authenticateWithGoogle (36), restore, validateSession (56) |
-| AIService (interface, ABC) | 58 | processFile (60), summarize (62), translatePart (64), translateSummary (66), answer (68), generateQuiz (70), generateExam (72), verifyQuestion (74) |
-| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 76 | processFile (163), summarize (212, splits big files into parts + coverage warning), translatePart (265), translateSummary (269), answer (274), generateQuiz (312), generateExam (318), verifyQuestion (331) |
+| AuthService | 11 | checkProfile (34), authenticateWithGoogle (63), signIn (79), validateSession (85) |
+| AIService (interface, ABC) | 87 | processFile (89), summarize (91), translatePart (93), translateSummary (95), answer (97), generateQuiz (99), generateExam (101), verifyQuestion (103) |
+| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 105 | processFile (192), summarize (241, splits big files into parts + coverage warning), translatePart (294), translateSummary (298), answer (303), generateQuiz (341), generateExam (347), verifyQuestion (360) |
 
 ## store.py
 | Class | Methods |
 |---|---|
-| Store (Firestore, memory fallback) | load_pages, save_pages, user_files, add_user_file, remove_user_file, chat, add_chat, cached, cache |
+| Store (Firestore, memory fallback) | profile, save_profile, claim_id, load_pages, save_pages, user_files, add_user_file, remove_user_file, chat, add_chat, cached, cache |
 
 ## static/index.html
 | Class | Where | Methods |
 |---|---|---|
-| SpeechService «Service» | `const SpeechService` (line 801) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
+| SpeechService «Service» | `const SpeechService` (line 827) | speechToText, textToSpeech (+ stopListening, stopSpeaking) — uses the free Web Speech API in the browser, so no server or API key is needed |
 
 ## app.py (web routes that use the classes)
 | Use case | Route | Code used |
 |---|---|---|
-| Register / Login with Google | GET /api/config, POST /api/login `{credential}` | AuthService.authenticateWithGoogle (INSTRUCTOR_EMAILS, ALLOWED_EMAIL_DOMAIN), AuthService.restore |
+| Register / Login with Google | GET /api/config, POST /api/login `{credential}` | AuthService.authenticateWithGoogle (ALLOWED_EMAIL_DOMAIN) |
+| **NEW** First-login profile (role from number) | POST /api/profile `{name, universityId, universityEmail, university}` | AuthService.checkProfile / roleFromId / signIn, Store.save_profile / claim_id |
 | Upload Course File | POST /api/files | User.uploadFile → CourseFile.validate, LLMService.processFile → CourseFile.encrypt |
 | Summarize Content | POST /api/files/<id>/summary (max 15 pages per call; the page sends bigger ranges in parts) | LLMService.summarize |
 | **NEW** Delete Uploaded File | DELETE /api/files/<id> | removes the CourseFile from the user's list and their chat for it |

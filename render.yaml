@@ -20,7 +20,7 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID       # OAuth Web client ID; turns on Google sign-in and turns off the demo login
         value: 40606909952-t85saujbh7mh3dkle5onssg52r53jfis.apps.googleusercontent.com
-      - key: INSTRUCTOR_EMAILS      # optional, comma list; if set, only these e-mails are instructors
+      - key: INSTRUCTOR_EMAILS      # optional, comma list of Google e-mails allowed to register a 6-digit staff number
         sync: false
       - key: ALLOWED_EMAIL_DOMAIN   # optional, e.g. iu.edu.sa; if set, only that domain can sign in
         sync: false
