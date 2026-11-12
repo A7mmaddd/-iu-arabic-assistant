@@ -111,6 +111,20 @@ class LLMService(AIService):
     RULES = ("Preserve the original academic and religious meaning of Arabic terms. "
              "Never issue fatwas or independent religious rulings.")
 
+    @staticmethod
+    def _lang(f, frm=1, to=None):
+        """Arabic if most pages with text in the range are Arabic, else English."""
+        ps = [p for p in f.pages if frm <= p.pageNumber <= (to or 10**9) and p.text.strip()]
+        return "Arabic" if ps and sum(p.isRTL for p in ps) >= 0.4 * len(ps) else "English"
+
+    @staticmethod
+    def _only(lang):
+        """A strict 'write only in X' line; repeated in Arabic because small models follow it better."""
+        if lang == "Arabic":
+            return (" IMPORTANT: write ALL output (titles, points, questions, options, explanations, key terms, notes)"
+                    " in Arabic only, even if some source text is in English. اكتب كل المخرجات باللغة العربية فقط.")
+        return " IMPORTANT: write ALL output in English only, even if some source text is in Arabic."
+
     def processFile(self, f):
         if f.fileType == "pdf":
             from pypdf import PdfReader
@@ -129,15 +143,14 @@ class LLMService(AIService):
 
     PART_PROMPT = ("You write detailed study notes for one part of an Arabic course file. " + RULES +
                    " Cover EVERY main idea, definition, rule, condition, list, example and evidence in this part; do not"
-                   " skip sections. Write in the same language as the file. Group related ideas instead of writing one"
+                   " skip sections. Group related ideas instead of writing one"
                    " line per page. End each point with its page like (p. 12)."
                    ' Output: {"points":["..."],"keyTerms":["..."],"tooDense":false}.'
                    " Set tooDense to true only if this part has so much information that you had to leave out"
                    " important ideas.")
     MERGE_PROMPT = ("You turn study notes (or course text) into one complete, well-organized summary for a student. " +
                     RULES + " Organize by topic, not by page. Keep every important idea, definition and key term;"
-                    " merge repeated ideas; keep the page references like (p. 12). Write in the same language as the"
-                    " source. Use as many sections and points as the material needs - a long file needs a long summary."
+                    " merge repeated ideas; keep the page references like (p. 12). Use as many sections and points as the material needs - a long file needs a long summary."
                     ' Output: {"sections":[{"title":"...","points":["..."]}],"keyTerms":["..."],"note":""}.'
                     " Leave note empty unless the material was too large or too dense to cover well; then say in one"
                     " short sentence what may be missing.")
@@ -155,8 +168,8 @@ class LLMService(AIService):
     def _pages_text(pages):
         return "\n\n".join(f"[Page {p.pageNumber}]\n{p.text}" for p in pages)
 
-    def _summarize_part(self, pages):
-        d = self._json(self.PART_PROMPT, f"PAGES {pages[0].pageNumber}-{pages[-1].pageNumber}:\n\n" +
+    def _summarize_part(self, pages, lang="Arabic"):
+        d = self._json(self.PART_PROMPT + self._only(lang), f"PAGES {pages[0].pageNumber}-{pages[-1].pageNumber}:\n\n" +
                        self._pages_text(pages), max_tokens=self.SUMMARY_TOKENS)
         if not isinstance(d, dict) or not d.get("points"): return None
         return d
@@ -166,6 +179,7 @@ class LLMService(AIService):
         readable = [p for p in pages if len(p.text.strip()) >= self.MIN_PAGE_CHARS]
         emptyPages = [p.pageNumber for p in pages if p not in readable]
         failedPages, dense, note = [], False, ""
+        lang = self._lang(f, frm, to)
 
         if not self.client:
             sections, terms = [{"title": "Demo", "points": [self.DEMO]}], []
@@ -177,7 +191,7 @@ class LLMService(AIService):
                 notes, source = None, self._pages_text(readable)
             else:                                    # big file: detailed notes for each part (3 at a time)
                 with ThreadPoolExecutor(max_workers=3) as ex:
-                    results = list(ex.map(self._safe_part, parts))
+                    results = list(ex.map(lambda ps: self._safe_part(ps, lang), parts))
                 notes = []
                 for part, d in zip(parts, results):
                     rng = f"{part[0].pageNumber}-{part[-1].pageNumber}"
@@ -187,14 +201,15 @@ class LLMService(AIService):
                 source = json.dumps(notes, ensure_ascii=False)
             d = None
             if notes is None or notes:
-                try: d = self._json(self.MERGE_PROMPT, source, max_tokens=self.SUMMARY_TOKENS)
+                try: d = self._json(self.MERGE_PROMPT + self._only(lang), source, max_tokens=self.SUMMARY_TOKENS)
                 except Exception: d = None
             if isinstance(d, dict) and d.get("sections"):
                 sections = [{"title": str(s.get("title", "")), "points": [str(x) for x in s.get("points", [])]}
                             for s in d["sections"] if isinstance(s, dict)]
                 terms, note = d.get("keyTerms", []), str(d.get("note") or "").strip()
             elif notes:                              # merge failed -> still show the notes of every part
-                sections = [{"title": f"Pages {n['pages']}", "points": n["points"]} for n in notes]
+                sections = [{"title": ("الصفحات " if lang == "Arabic" else "Pages ") + n["pages"], "points": n["points"]}
+                            for n in notes]
                 terms = list(dict.fromkeys(t for n in notes for t in n["keyTerms"]))
             else:                                    # nothing worked
                 sections, terms = [], []
@@ -208,8 +223,8 @@ class LLMService(AIService):
         sm = Summary(bullets, terms, frm, to, sections=sections, coverage=coverage)
         f.summaries.append(sm); return sm
 
-    def _safe_part(self, pages):
-        try: return self._summarize_part(pages)
+    def _safe_part(self, pages, lang="Arabic"):
+        try: return self._summarize_part(pages, lang)
         except Exception: return None
 
     def translatePart(self, f, frm, to):
@@ -238,23 +253,38 @@ class LLMService(AIService):
                           "language); do what they ask, still using only the file. " + self.RULES +
                           "\n\nFILE:\n" + self._text(f), msgs)
 
-    def _mcqs(self, f, n, lang):
-        d = self._json(f"Write {n} multiple-choice questions in {lang} from the file. " + self.RULES +
+    def _mcqs(self, f, n, lang, frm=1, to=None):
+        """Questions ONLY from pages frm..to (only those pages are sent, and questions citing other pages are dropped)."""
+        to = min(to or len(f.pages), len(f.pages))
+        d = self._json(f"Write {n} multiple-choice questions in {lang} from the course pages below (pages {frm}-{to}). "
+                       f"Use ONLY these pages; never ask about anything that is not in them. " + self.RULES +
                        ' Output: [{"questionText":"","options":["A","B","C","D"],"correctAnswer":"(must equal one option)",'
-                       '"explanation":"","page":0}] where page is the page number the answer comes from.',
-                       self._text(f))
-        return [x for x in (d or []) if isinstance(x, dict) and x.get("correctAnswer") in (x.get("options") or [])]
+                       '"explanation":"","page":0}] where page is the page number the answer comes from.' + self._only(lang),
+                       self._text(f, frm, to))
+        ok = []
+        for x in (d or []):
+            if not isinstance(x, dict) or x.get("correctAnswer") not in (x.get("options") or []): continue
+            p = self._page(x.get("page"), f)
+            if p and not frm <= p <= to: continue                             # cited a page outside the range
+            ok.append(x)
+        return ok
 
-    def generateQuiz(self, f, n):
+    @staticmethod
+    def _language(language, f, frm, to):
+        if language in ("Arabic", "English"): return language
+        return LLMService._lang(f, frm, to)                                  # not chosen -> language of the pages
+
+    def generateQuiz(self, f, n, language=None, frm=1, to=None):
+        language = self._language(language, f, frm, to)
         qs = [MCQQuestion(x["questionText"], x["options"], x["correctAnswer"], x.get("explanation", ""))
-              for x in self._mcqs(f, n, "the file's language")][:n]       # n is 5-10 (clamped in app.py)
+              for x in self._mcqs(f, n, language, frm, to)][:n]               # n is 5-10 (clamped in app.py)
         qz = Quiz(qs, f); f.quizzes.append(qz); return qz
 
-    def generateExam(self, f, n, language="English"):
+    def generateExam(self, f, n, language="English", frm=1, to=None):
         language = "Arabic" if language == "Arabic" else "English"
         qs = [ExamQuestion(x["questionText"], x["options"], x["correctAnswer"], x.get("explanation", ""),
                            evidencePage=self._page(x.get("page"), f))
-              for x in self._mcqs(f, n, language)][:n]
+              for x in self._mcqs(f, n, language, frm, to)][:n]
         return Exam(qs, language, f.fileName, f)
 
     @staticmethod

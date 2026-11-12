@@ -472,6 +472,7 @@ select{cursor:pointer}
 
     <div class="panel hide" id="p-qz"><p class="hint" data-i18n="qzHint"></p>
       <div class="row"><span data-i18n="nQ"></span> <input type="number" id="qn" min="5" max="10" value="5" style="width:72px">
+      <label for="qlang" data-i18n="exLang"></label> <select id="qlang"><option value="Arabic" data-i18n="langAr"></option><option value="English" data-i18n="langEn"></option></select>
       <button id="bqz"><svg class="i"><use href="#i-spark"/></svg><span data-i18n="bQz"></span></button></div><div id="o-qz"></div></div>
 
     <div class="panel hide" id="p-ex"><p class="hint" data-i18n="exHint"></p>
@@ -524,10 +525,10 @@ en:{
  trHint:'Translate the selected pages into English.',bTr:'Translate pages',trBusy:'Translating…',trTitle:'Translation',
  tuHint:'Answers come only from your uploaded file.',askPh:'Ask a question about your file',ask:'Ask',tuEmpty:'Ask anything about your file',
  sug:['Summarize the main ideas','Explain the key terms','Give me an example'],
- nQ:'Questions',qzHint:'Test yourself with multiple-choice questions.',bQz:'Create quiz',qzBusy:'Creating your quiz…',qzNone:'No questions were generated. Check your API key and try again.',
+ nQ:'Questions',qzHint:'Test yourself with multiple-choice questions from the selected pages, in the language you choose.',bQz:'Create quiz',qzBusy:'Creating your quiz…',qzNone:'No questions were generated. Check your API key and try again.',
  submit:'Submit answers',answered:(a,n)=>a+' of '+n+' answered',score:'Score',correct:'Correct. ',correctAns:'Correct answer: ',newQuiz:'New quiz',
  g1:'Excellent work!',g2:'Good job, keep going.',g3:'Review the file and try again.',
- exHint:'Generate exam questions in English or Arabic, then edit them, add your own, print or publish.',exLang:'Language',langEn:'English',langAr:'Arabic (العربية)',
+ exHint:'Generate exam questions from the selected pages in English or Arabic, then edit them, add your own, print or publish.',exLang:'Language',langEn:'English',langAr:'Arabic (العربية)',
  qText:'Question',optN:n=>'Option '+n,markCorrect:'Pick the correct answer',explOpt:'Explanation (optional)',
  addQ:'Add your own question',addQHint:'Write a question and its options. The assistant checks that the answer is in the file.',bAddQ:'Add and check',checking:'Checking the answer in the file…',
  added:'Question added',addedWarn:'Question added, but please check the warning.',byYou:'Your question',
@@ -572,10 +573,10 @@ ar:{
  trHint:'ترجم الصفحات المحددة إلى الإنجليزية.',bTr:'ترجمة الصفحات',trBusy:'جارٍ الترجمة…',trTitle:'الترجمة',
  tuHint:'الإجابات تأتي من ملفك المرفوع فقط.',askPh:'اسأل سؤالًا عن ملفك',ask:'إرسال',tuEmpty:'اسأل أي شيء عن ملفك',
  sug:['لخّص الأفكار الرئيسية','اشرح أهم المصطلحات','أعطني مثالًا'],
- nQ:'عدد الأسئلة',qzHint:'اختبر نفسك بأسئلة اختيار من متعدد.',bQz:'إنشاء الاختبار',qzBusy:'جارٍ إنشاء الاختبار…',qzNone:'لم يتم إنشاء أسئلة. تحقق من مفتاح API وحاول مرة أخرى.',
+ nQ:'عدد الأسئلة',qzHint:'اختبر نفسك بأسئلة اختيار من متعدد من الصفحات المحددة، باللغة التي تختارها.',bQz:'إنشاء الاختبار',qzBusy:'جارٍ إنشاء الاختبار…',qzNone:'لم يتم إنشاء أسئلة. تحقق من مفتاح API وحاول مرة أخرى.',
  submit:'تسليم الإجابات',answered:(a,n)=>'تمت الإجابة على '+a+' من '+n,score:'النتيجة',correct:'صحيح. ',correctAns:'الإجابة الصحيحة: ',newQuiz:'اختبار جديد',
  g1:'عمل ممتاز!',g2:'أحسنت، واصل التقدم.',g3:'راجع الملف وحاول مرة أخرى.',
- exHint:'أنشئ أسئلة امتحان بالعربية أو الإنجليزية، ثم عدّلها أو أضف أسئلتك أو اطبعها أو انشرها.',exLang:'اللغة',langEn:'الإنجليزية',langAr:'العربية',
+ exHint:'أنشئ أسئلة امتحان من الصفحات المحددة بالعربية أو الإنجليزية، ثم عدّلها أو أضف أسئلتك أو اطبعها أو انشرها.',exLang:'اللغة',langEn:'الإنجليزية',langAr:'العربية',
  qText:'السؤال',optN:n=>'الخيار '+n,markCorrect:'اختر الإجابة الصحيحة',explOpt:'الشرح (اختياري)',
  addQ:'أضف سؤالك الخاص',addQHint:'اكتب السؤال وخياراته، وسيتحقق المساعد من وجود الإجابة في الملف.',bAddQ:'إضافة وتحقق',checking:'جارٍ التحقق من الإجابة في الملف…',
  added:'تمت إضافة السؤال',addedWarn:'تمت إضافة السؤال، لكن راجع التنبيه.',byYou:'سؤالك',
@@ -844,7 +845,7 @@ $('#bmic').onclick=async()=>{const b=$('#bmic');
 
 /* ---------- quiz ---------- */
 $('#bqz').onclick=function(){if(!ready())return;
-  run('#o-qz',t('qzBusy'),async()=>{S.quiz=await api(`/api/files/${S.fid}/quiz`,'POST',{n:+$('#qn').value});drawQuiz()},this)};
+  run('#o-qz',t('qzBusy'),async()=>{S.quiz=await api(`/api/files/${S.fid}/quiz`,'POST',{n:+$('#qn').value,language:$('#qlang').value,...rng()});drawQuiz()},this)};
 const LET='ABCDEFGH';
 function drawQuiz(){const qs=S.quiz.questions;if(!qs.length)return put('#o-qz',fail(t('qzNone')));
   const bar=h('div',{class:'qbar',id:'qbar'},h('div',{class:'pw'},h('span',{id:'pc'}),h('div',{class:'prog'},h('i',{id:'pg'}))),
@@ -876,7 +877,7 @@ async function submitQuiz(){const ans=answers(),b=$('#bsub');b.disabled=true;
 
 /* ---------- exam (instructor) ---------- */
 $('#bex').onclick=function(){if(!ready())return;
-  run('#o-ex',t('exBusy'),async()=>{S.exam=await api(`/api/files/${S.fid}/exam`,'POST',{n:+$('#en').value,language:$('#elang').value});drawExam();loadExams()},this)};
+  run('#o-ex',t('exBusy'),async()=>{S.exam=await api(`/api/files/${S.fid}/exam`,'POST',{n:+$('#en').value,language:$('#elang').value,...rng()});drawExam();loadExams()},this)};
 async function loadExams(){if(!S.user||S.user.role!=='instructor')return;
   try{S.exams=await api('/api/exams');drawExamList()}catch{}}
 const langName=l=>l==='Arabic'?t('langAr'):t('langEn');

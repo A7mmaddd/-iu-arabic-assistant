@@ -85,6 +85,12 @@ def delete_file(fid):
     for s in f.summaries: SUMMARIES.pop(s.id, None)
     return jsonify(ok=True)
 
+def page_range(f, j):
+    """The pages the user selected (from/to in the request), kept inside the file."""
+    last = max(1, len(f.pages))
+    frm = max(1, min(last, int(j.get("from") or 1))); to = max(1, min(last, int(j.get("to") or last)))
+    return (frm, to) if frm <= to else (to, frm)
+
 MAX_SUMMARY_PAGES = 15      # one summary request = at most 15 pages; the page asks for bigger ranges in parts
 
 @app.post("/api/files/<fid>/summary")
@@ -143,8 +149,10 @@ def quiz(fid):
     if locked(): return err(EXAM_LOCK, 423)
     f = own(fid)
     if not f: return err("Not found", 404)
-    n = max(5, min(10, int((request.json or {}).get("n", 5))))
-    q = ai.generateQuiz(f, n); QUIZZES[q.id] = q
+    j = request.json or {}
+    n = max(5, min(10, int(j.get("n", 5))))
+    frm, to = page_range(f, j)
+    q = ai.generateQuiz(f, n, j.get("language"), frm, to); QUIZZES[q.id] = q
     return jsonify(id=q.id, questions=[dict(questionText=x.questionText, options=x.options) for x in q.questions])
 
 @app.post("/api/quizzes/<qid>/submit")
@@ -171,7 +179,8 @@ def exam(fid):
     if not f or not u: return err("Instructors only", 403)
     j = request.json or {}
     n = max(1, min(20, int(j.get("n", 5))))
-    e = u.generateExam(ai, f, n, "Arabic" if j.get("language") == "Arabic" else "English"); EXAMS[e.id] = e
+    frm, to = page_range(f, j)
+    e = u.generateExam(ai, f, n, "Arabic" if j.get("language") == "Arabic" else "English", frm, to); EXAMS[e.id] = e
     return jsonify(exam_dict(e))
 
 def editable(eid, i=None):

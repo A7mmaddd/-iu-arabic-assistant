@@ -38,7 +38,7 @@ class Student(User):
         return self.askTutor(ai, f, audio, replyTo)
     def listenTo(self, msg):
         return msg.text                  # handed to SpeechService.textToSpeech (runs in the browser)
-    def requestQuiz(self, ai, f, n=5): return ai.generateQuiz(f, n)
+    def requestQuiz(self, ai, f, n=5, language=None, frm=1, to=None): return ai.generateQuiz(f, n, language, frm, to)
     def takeExam(self, exam, answers): return exam.submitAttempt(self, answers)   # Student --makes--> ExamAttempt
 
 class Instructor(User):
@@ -49,8 +49,8 @@ class Instructor(User):
         ok = f.validate()
         if ok: self.files.append(f)
         return ok
-    def generateExam(self, ai, f, n=5, language="English"):
-        e = ai.generateExam(f, n, language); self.exams.append(e); return e   # Instructor 1 --prepares--> 0..* Exam
+    def generateExam(self, ai, f, n=5, language="English", frm=1, to=None):
+        e = ai.generateExam(f, n, language, frm, to); self.exams.append(e); return e   # Instructor 1 --prepares--> 0..* Exam
     def reviewQuestion(self, q): return q
     def editQuestion(self, ai, exam, q, text, options, correctAnswer):
         q.edit(text, options, correctAnswer)
