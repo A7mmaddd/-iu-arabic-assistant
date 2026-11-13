@@ -24,3 +24,5 @@ services:
         sync: false
       - key: ALLOWED_EMAIL_DOMAIN   # optional, e.g. iu.edu.sa; if set, only that domain can sign in
         sync: false
+      - key: GOOGLE_SITE_VERIFICATION   # optional; the content="..." code from Google Search Console (HTML tag method)
+        sync: false

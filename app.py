@@ -4,8 +4,10 @@ from flask import Flask, request, jsonify, session, send_from_directory
 from models import *
 from services import AuthService, LLMService, ProfileError
 from store import Store, file_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__, static_folder="static")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)   # Render serves https through a proxy
 app.secret_key = os.getenv("SECRET_KEY", "change-me")
 app.config.update(MAX_CONTENT_LENGTH=CourseFile.MAX, PERMANENT_SESSION_LIFETIME=timedelta(days=30),
                   SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=bool(os.getenv("RENDER")))
@@ -45,7 +47,27 @@ EXAM_LOCK = "You are taking an exam. Other features are locked until you submit 
 def locked(): return open_attempt(me())[0] is not None
 
 @app.get("/")
-def index(): return send_from_directory("static", "index.html")
+def index():
+    html = open(os.path.join(app.static_folder, "index.html"), encoding="utf-8").read()
+    base = request.host_url
+    tags = f'<link rel="canonical" href="{base}">\n<meta property="og:url" content="{base}">'
+    gsv = os.getenv("GOOGLE_SITE_VERIFICATION", "").strip()   # from Google Search Console -> "HTML tag"
+    if gsv: tags += f'\n<meta name="google-site-verification" content="{gsv}">'
+    return html.replace("<!--GSV-->", tags, 1), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+# ---- For Google search: tell crawlers what they may read, and list the public page ----
+@app.get("/robots.txt")
+def robots():
+    body = f"User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: {request.host_url}sitemap.xml\n"
+    return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+@app.get("/sitemap.xml")
+def sitemap():
+    body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f'<url><loc>{request.host_url}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>'
+            '</urlset>\n')
+    return body, 200, {"Content-Type": "application/xml; charset=utf-8"}
 
 @app.get("/api/config")
 def config():

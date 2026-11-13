@@ -40,3 +40,12 @@ so the next sign-in goes straight in. One number can only be registered by one G
 - Each user's file list and AI-tutor chat are saved under that user only; nobody else can read their chat.
 - Without FIREBASE_CREDENTIALS everything still works, but only in memory (resets when the server restarts).
 - Never put the Firebase key file on GitHub (`firebase-key.json` is in .gitignore).
+
+## Show up in Google search
+The site already has a description, `/robots.txt` and `/sitemap.xml`. To get it into Google:
+1. Open search.google.com/search-console -> Add property -> "URL prefix" -> paste your https://....onrender.com link.
+2. Choose the "HTML tag" method and copy only the code inside `content="..."`.
+3. On Render: Environment -> set `GOOGLE_SITE_VERIFICATION` to that code -> Save (it redeploys), then press Verify.
+4. In Search Console: Sitemaps -> enter `sitemap.xml` -> Submit. Then URL Inspection -> Request indexing.
+It usually appears in results within a few days to a few weeks. Links to the site from other pages
+(e.g. the university or course page) help it rank higher.
