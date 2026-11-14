@@ -101,7 +101,11 @@ class Store:
             texts += c["pages"]
         return texts if len(texts) == info.get("pages") else None
 
-    def save_pages(self, h, name, file_type, texts):
+    def file_info(self, h):
+        return self.get(f"files/{h}") or {}
+
+    def save_pages(self, h, name, file_type, texts, extra=None):
+        """extra: more fields for the file record, e.g. which scanned pages still need reading."""
         chunks, cur, size = [], [], 0
         for t in texts:
             b = len(t.encode("utf-8")) + 16
@@ -109,8 +113,8 @@ class Store:
             cur.append(t[:CHUNK_BYTES // 2]); size += b     # a single huge page is cut to fit
         if cur or not chunks: chunks.append(cur)
         for i, c in enumerate(chunks): self.set(f"files/{h}/chunks/{i:04d}", {"pages": c})
-        self.set(f"files/{h}", {"name": name, "type": file_type, "pages": len(texts), "chunks": len(chunks),
-                                "savedAt": time.time()})
+        self.set(f"files/{h}", dict(extra or {}, name=name, type=file_type, pages=len(texts), chunks=len(chunks),
+                                    savedAt=time.time()))
 
     # ---- profile (filled once on the first login, linked to the Google account) ----
     def profile(self, email):

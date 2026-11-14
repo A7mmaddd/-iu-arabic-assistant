@@ -283,6 +283,8 @@ select{cursor:pointer}
 .vnote{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:10px 0 0;padding:8px 12px;border-radius:var(--r-sm);line-height:1.6}
 .vnote svg{margin-top:3px;width:16px;height:16px}
 .vnote.ok{background:var(--okbg);color:var(--ok)}.vnote.warn{background:var(--warnbg);color:var(--warn)}
+#scanbar{margin:0 0 10px}#scanbar .vnote{margin:0}#scanbar .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
+#scanbar .bar i{display:block;height:100%;background:var(--brand2);transition:width .4s var(--ease)}
 .eoedit{display:flex;gap:10px;align-items:center;margin:7px 0}
 .eoedit input[type=text]{flex:1;min-width:0;padding:8px 12px}
 .eoedit input[type=radio]{width:18px;height:18px;flex:none;accent-color:var(--ok);cursor:pointer;margin:0}
@@ -466,6 +468,7 @@ select{cursor:pointer}
       <button class="ghost" id="all" data-i18n="all"></button>
     </div>
   </div>
+  <div id="scanbar" class="hide" role="status"></div>
   <nav id="tabs" role="tablist">
     <button data-t="sum" class="on"><svg class="i"><use href="#i-sum"/></svg><span data-i18n="tSum"></span></button>
     <button data-t="tr"><svg class="i"><use href="#i-tr"/></svg><span data-i18n="tTr"></span></button>
@@ -567,7 +570,7 @@ en:{
  pubTitle:'Published exam',shareCode:'Share this code with your students',locked:'Published exams are locked and cannot be edited.',
  results:'Student results',refresh:'Refresh',noAttempts:'No student has taken this exam yet.',colName:'Name',colEmail:'Email',colScore:'Score',colTime:'Submitted',
  avg:(n,p)=>n+(n===1?' student':' students')+' · average '+p+'%',myExams:'My exams',draft:'Draft',open:'Open',attemptsN:n=>n+(n===1?' attempt':' attempts'),loading:'Loading…',
-uploaded:'File uploaded',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
+uploaded:'File uploaded',scanRun:(d,n)=>'This file is scanned (pictures of pages). Reading the pages: '+d+' of '+n+'. You can start now; the pages you ask for are read first.',scanPaused:n=>n+' scanned page(s) are not read yet (the server restarted). Upload the file again to carry on from where it stopped.',scanFailed:n=>n+' scanned page(s) could not be read. Upload the file again to try them again.',scanDone:'All scanned pages are read.',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
  sumPart:(a,b)=>'Pages '+a+'–'+b,sumPartBusy:(a,b)=>'Summarizing pages '+a+'–'+b+'…',sumProg:(d,n)=>'Summarized '+d+' of '+n+' parts',
  sumBatchInfo:n=>'Large ranges are summarized 15 pages at a time ('+n+' parts). Each part appears as soon as it is ready.',retry:'Try again',newSum:'New summary',newTr:'New translation',aiBusy:'The AI is busy right now (Google servers or the free limit). Please try again in a minute.',
  reading:n=>'Reading '+n+'…',badType:'Only PDF, PPT or PPTX files are accepted.',tooBig:'File is larger than 300 MB.',
@@ -616,7 +619,7 @@ ar:{
  pubTitle:'الامتحان منشور',shareCode:'شارك هذا الرمز مع طلابك',locked:'الامتحان المنشور مقفل ولا يمكن تعديله.',
  results:'نتائج الطلاب',refresh:'تحديث',noAttempts:'لم يحل أي طالب هذا الامتحان بعد.',colName:'الاسم',colEmail:'البريد',colScore:'الدرجة',colTime:'وقت التسليم',
  avg:(n,p)=>n+' طالب · المتوسط '+p+'%',myExams:'امتحاناتي',draft:'مسودة',open:'فتح',attemptsN:n=>n+' محاولة',loading:'جارٍ التحميل…',
-uploaded:'تم رفع الملف',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
+uploaded:'تم رفع الملف',scanRun:(d,n)=>'هذا الملف ممسوح ضوئيًا (صور صفحات). جارٍ قراءة الصفحات: '+d+' من '+n+'. تقدر تبدأ الآن، والصفحات اللي تطلبها تُقرأ أولًا.',scanPaused:n=>'لم تُقرأ '+n+' صفحة ممسوحة بعد (أُعيد تشغيل الخادم). ارفع الملف مرة ثانية ليكمل من حيث توقف.',scanFailed:n=>'تعذّرت قراءة '+n+' صفحة ممسوحة. ارفع الملف مرة ثانية لإعادة المحاولة.',scanDone:'تمت قراءة كل الصفحات الممسوحة.',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
  sumPart:(a,b)=>'الصفحات '+a+'–'+b,sumPartBusy:(a,b)=>'جارٍ تلخيص الصفحات '+a+'–'+b+'…',sumProg:(d,n)=>'تم تلخيص '+d+' من '+n+' أجزاء',
  sumBatchInfo:n=>'النطاقات الكبيرة تُلخّص كل 15 صفحة على حدة ('+n+' أجزاء). يظهر كل جزء فور جاهزيته.',retry:'إعادة المحاولة',newSum:'ملخص جديد',newTr:'ترجمة جديدة',aiBusy:'الذكاء الاصطناعي مشغول الآن (ضغط على خوادم Google أو انتهى الحد المجاني). حاول مرة أخرى بعد دقيقة.',
  reading:n=>'جارٍ قراءة '+n+'…',badType:'الملفات المقبولة: PDF أو PPT أو PPTX فقط.',tooBig:'حجم الملف أكبر من 300 ميغابايت.',
@@ -752,10 +755,24 @@ function pick(id){S.fid=id;const f=cur();const changed=S.last!==id;
   if(f){const m=Math.max(1,f.pages);$('#a').max=$('#b').max=m;
     if(!$('#a').dataset.f||$('#a').dataset.f!==f.id){$('#a').value=1;$('#b').value=m;$('#a').dataset.f=f.id}
     $('#of').textContent=t('of',f.pages)}else $('#of').textContent='';
-  drawFiles()}
+  drawFiles();watchScan()}
+/* scanned files: the server reads the page pictures in the background; show progress and keep it updated */
+function drawScan(){const f=cur(),s=f&&f.scan,bar=$('#scanbar');
+  if(!s||S.tab==='te'||(!s.running&&!s.paused&&!s.failed)){bar.classList.add('hide');return}
+  bar.classList.remove('hide');
+  if(s.running)put('#scanbar',h('div',{class:'vnote warn',dir:'auto'},h('span',{class:'spin'}),
+    h('span',{style:'flex:1'},t('scanRun',s.done,s.total),h('div',{class:'bar'},h('i',{style:`width:${Math.round(100*(s.done+s.failed)/Math.max(1,s.total))}%`})))));
+  else put('#scanbar',h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
+    h('span',{},s.paused?t('scanPaused',s.total-s.done-s.failed):t('scanFailed',s.failed))))}
+let scanTimer=null;
+function watchScan(){clearTimeout(scanTimer);const f=cur();drawScan();
+  if(!f||!f.scan||!f.scan.running)return;
+  scanTimer=setTimeout(async()=>{try{const r=await api(`/api/files/${f.id}/scan`);const was=f.scan&&f.scan.running;
+      f.scan=r.scan;if(was&&r.scan&&!r.scan.running&&!r.scan.failed&&!r.scan.paused)toast(t('scanDone'),'ok')}catch{}
+    if(S.fid===f.id)watchScan()},3000)}
 function setTitle(){const f=cur();$('#fname').textContent=S.tab==='te'?t('tTe'):(f?f.name:t('noFileSel'))}
 function updateBanner(){$('#nofile').classList.toggle('hide',!!cur()||S.tab==='te');
-  $('.range').classList.toggle('hide',S.tab==='te');setTitle()}
+  $('.range').classList.toggle('hide',S.tab==='te');setTitle();drawScan()}
 function rng(){const f=cur(),max=Math.max(1,f?f.pages:1);
   let a=Math.max(1,Math.min(max,Math.round(+$('#a').value)||1)),b=Math.max(1,Math.min(max,Math.round(+$('#b').value)||max));
   if(a>b)[a,b]=[b,a];$('#a').value=a;$('#b').value=b;return{from:a,to:b}}
