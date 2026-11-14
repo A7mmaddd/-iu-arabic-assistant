@@ -37,6 +37,8 @@ so the next sign-in goes straight in. One number can only be registered by one G
 ## Database (Firebase / Cloud Firestore)
 - The same file uploaded by different students is recognised by its SHA-256 hash: its text, summaries and
   translations are saved once and reused (no new AI call). Quizzes and exam questions are always made fresh.
+- "New summary" / "New translation" asks the AI again for that user only; the saved copy is not replaced,
+  so other users still get the first one.
 - Each user's file list and AI-tutor chat are saved under that user only; nobody else can read their chat.
 - Without FIREBASE_CREDENTIALS everything still works, but only in memory (resets when the server restarts).
 - Never put the Firebase key file on GitHub (`firebase-key.json` is in .gitignore).
