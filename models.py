@@ -133,6 +133,8 @@ class ExamQuestion(MCQQuestion):
         self.isVerified = source == "AI"         # AI questions come from the file; instructor ones get checked
         self.evidencePage = evidencePage         # page where the answer was found (0 = unknown)
         self.verifyNote = ""                     # short result of the check, shown to the instructor
+        self.ar = None                           # English exams: Arabic translation for the instructor only
+                                                 # {"questionText": str, "options": [str]} (never sent to students)
     @staticmethod
     def clean(text, options, correctAnswer):
         """Validate an edited/new question. Returns (text, options, correct) or raises ValueError."""

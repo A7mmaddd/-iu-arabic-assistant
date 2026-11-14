@@ -19,6 +19,9 @@ take a published exam (exam mode locks the other features and counts leaving the
 Instructor: generate exam questions in English or Arabic, edit questions and options, add own questions
 (checked against the file), print or copy the exam (with or without answer key), publish with a code,
 see results with the most-missed questions and how many times each student left the page.
+English exams show an Arabic translation under every question (instructor only, never sent to students);
+the instructor can write a question or options in Arabic and they are translated to English on save.
+A "Guide" button (between dark mode and language) shows a short note next to every visible button for 5 seconds.
 
 ## Deploy on Render (no cmd needed)
 1. Push this folder to a GitHub repo (render.yaml must be at the repo root).

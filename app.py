@@ -1,4 +1,4 @@
-import os, hashlib, time
+import os, re, hashlib, time
 from datetime import timedelta
 from flask import Flask, request, jsonify, session, send_from_directory
 from models import *
@@ -347,7 +347,20 @@ def submit(qid):
 # ---------------- Exam (Instructor) ----------------
 def q_dict(q):
     return dict(questionText=q.questionText, options=q.options, correctAnswer=q.correctAnswer, explanation=q.explanation,
-                source=q.source, isVerified=q.isVerified, evidencePage=q.evidencePage, verifyNote=q.verifyNote)
+                source=q.source, isVerified=q.isVerified, evidencePage=q.evidencePage, verifyNote=q.verifyNote,
+                ar=getattr(q, "ar", None))                       # instructor only (students get take_dict)
+
+def to_exam_language(e, text, options, correct):
+    """English exam: fields the instructor wrote in Arabic are translated to English, and the Arabic translation
+    under the question is made again. The correct answer keeps its position. Returns (text, options, correct, ar)."""
+    if e.language != "English" or not ai.client: return text, options, correct, None
+    k = options.index(correct) if correct in options else -1
+    has_ar = lambda x: bool(re.search(r"[\u0600-\u06FF]", x))
+    new_text, new_opts, ar = ai.bilingualQuestion(text, options)
+    if ar is None and (has_ar(text) or any(map(has_ar, options))):     # never save Arabic into an English exam
+        raise ValueError("Could not translate the Arabic text to English right now (the AI is busy). "
+                         "Please try saving again in a minute.")
+    return new_text, new_opts, (new_opts[k] if k >= 0 else correct), ar
 def exam_dict(e):
     return dict(id=e.id, title=e.title, language=e.language, published=e.isPublished, code=e.code,
                 hasFile=bool(e.sourceFile), questions=[q_dict(x) for x in e.questions])
@@ -376,8 +389,11 @@ def edit_q(eid, i):
     if bad: return bad
     j = request.json or {}; q = e.questions[i]
     try:
-        instructor().editQuestion(ai, e, q, j.get("text", q.questionText), j.get("options", q.options),
-                                  j.get("correctAnswer", q.correctAnswer))
+        text, opts, correct = ExamQuestion.clean(j.get("text", q.questionText), j.get("options", q.options),
+                                                 j.get("correctAnswer", q.correctAnswer))
+        text, opts, correct, ar = to_exam_language(e, text, opts, correct)
+        instructor().editQuestion(ai, e, q, text, opts, correct)
+        q.ar = ar
     except ValueError as x: return err(str(x))
     return jsonify(q_dict(q))
 
@@ -393,10 +409,13 @@ def add_q(eid):
     e, bad = editable(eid)
     if bad: return bad
     j = request.json or {}
-    try: text, opts, correct = ExamQuestion.clean(j.get("text"), j.get("options"), j.get("correctAnswer"))
+    try:
+        text, opts, correct = ExamQuestion.clean(j.get("text"), j.get("options"), j.get("correctAnswer"))
+        text, opts, correct, ar = to_exam_language(e, text, opts, correct)
+        q = ExamQuestion(*ExamQuestion.clean(text, opts, correct), (j.get("explanation") or "").strip(), source="Instructor")
     except ValueError as x: return err(str(x))
-    q = instructor().addOwnQuestion(ai, e, ExamQuestion(text, opts, correct, (j.get("explanation") or "").strip(),
-                                                         source="Instructor"))
+    q.ar = ar
+    q = instructor().addOwnQuestion(ai, e, q)
     return jsonify(q_dict(q))
 
 @app.get("/api/exams")
