@@ -127,7 +127,7 @@ class LLMService(AIService):
             i = self._turn % len(self.models); self._turn += 1
         return self.models[i:] + self.models[:i]
 
-    def _gen(self, system, messages, max_tokens=8192, as_json=False):
+    def _gen(self, system, messages, max_tokens=8192, as_json=False, thinking_level=None):
         """One AI call. messages = [{"role": "user"|"assistant", "content": str}].
         Returns (text, cut) where cut=True means the reply hit max_tokens and is incomplete."""
         from google.genai import types, errors
@@ -137,7 +137,7 @@ class LLMService(AIService):
         def cfg(thinking):
             return types.GenerateContentConfig(
                 system_instruction=system, max_output_tokens=max_tokens,
-                thinking_config=types.ThinkingConfig(thinking_level=self.thinking) if thinking else None,
+                thinking_config=types.ThinkingConfig(thinking_level=thinking_level or self.thinking) if thinking else None,
                 response_mime_type="application/json" if as_json else None)
         last = None
         for rnd in range(2):                         # try every model; if all are busy, wait a little and try once more
@@ -158,9 +158,9 @@ class LLMService(AIService):
     def _ask(self, system, prompt, **kw):
         return self._chat(system, [{"role": "user", "content": prompt}], **kw)
 
-    def _chat(self, system, messages, max_tokens=8192):
+    def _chat(self, system, messages, max_tokens=8192, thinking_level=None):
         if not self.client: return self.DEMO
-        return self._gen(system, messages, max_tokens)[0]
+        return self._gen(system, messages, max_tokens, thinking_level=thinking_level)[0]
 
     def _json(self, system, prompt, max_tokens=8192):
         if not self.client: return None
@@ -346,11 +346,47 @@ class LLMService(AIService):
             q = "(I am replying to your last answer.) " + q
         if msgs and msgs[-1]["role"] == "user": msgs[-1]["content"] += "\n\n" + q
         else: msgs.append({"role": "user", "content": q})
-        return self._chat("You are a tutor. Answer ONLY from the file below. If the question is not related to the "
-                          "file, reply exactly: NOT_RELATED. The student may reply to one of your earlier answers to "
-                          "ask a follow-up or to ask you to change it (simpler, shorter, more examples, another "
-                          "language); do what they ask, still using only the file. " + self.RULES +
-                          "\n\nFILE:\n" + self._text(f), msgs)
+        system = self.TUTOR_PROMPT + self.RULES + "\n\nFILE:\n" + self._text(f)
+        text = self._chat(system, msgs)
+        if self._gave_up(text):
+            # Second look before saying "not in the file": the wording of the question often differs from the
+            # file. Think harder this time and try the possible meanings of the question.
+            again = [dict(m) for m in msgs]
+            again[-1]["content"] += self.LOOK_AGAIN
+            try: text = self._chat(system, again, thinking_level="MEDIUM")
+            except Exception as e: print("Tutor second look failed:", e)
+        t = text.strip()
+        if t.upper().startswith("NOT_FOUND"):           # related to the course but not found: keep the helpful reply
+            t = re.sub(r"^NOT_FOUND\s*[:：-]?\s*", "", t, flags=re.I).strip()
+            return t or "NOT_RELATED"
+        return text
+
+    TUTOR_PROMPT = (
+        "You are a patient tutor for a university course. Answer ONLY from the FILE below and cite pages like (p. 12). "
+        "Students often ask short, vague or informal questions, write in dialect, misspell words, use other words than "
+        "the file (synonyms, a general name for the topic, the English name of an Arabic term or the other way round), "
+        "or ask about an idea without naming it. Before deciding, work out what they most likely mean and look for the "
+        "closest content in the file: the same idea in other words, a broader or narrower topic, a definition, rule, "
+        "example or list that answers it.\n"
+        "- If you find related content, answer from it. If the question can mean more than one thing, answer the most "
+        "likely meaning, then add one short line naming the other meaning(s) found in the file so they can ask about it.\n"
+        "- If the file covers only part of it, answer that part and say briefly what the file does not cover.\n"
+        "- If it is about the subject of the file but you truly cannot find it, start your reply with NOT_FOUND: and "
+        "then, in the student's language, say that you could not find it in the file and suggest 2-3 topics from the "
+        "file that they may mean.\n"
+        "- Reply exactly NOT_RELATED only when the question has nothing to do with the file's subject at all "
+        "(e.g. sports, weather, programming, a different course).\n"
+        "Answer in the language of the question. The student may reply to one of your earlier answers to ask a "
+        "follow-up or to ask you to change it (simpler, shorter, more examples, another language); do what they ask, "
+        "still using only the file. ")
+    LOOK_AGAIN = ("\n\n(Look again before saying it is not in the file: the wording may differ from the file. "
+                  "First think of 2-3 clearer ways to ask this question and the words the file might use for it, in "
+                  "Arabic and English, then search the whole file for each. Answer if any of them is covered.)")
+
+    @staticmethod
+    def _gave_up(text):
+        t = (text or "").strip().upper()
+        return t == "NOT_RELATED" or t.startswith("NOT_FOUND")
 
     def _mcqs(self, f, n, lang, frm=1, to=None):
         """Questions ONLY from pages frm..to (only those pages are sent, and questions citing other pages are dropped)."""
