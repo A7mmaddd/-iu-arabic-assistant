@@ -836,7 +836,7 @@ $('#bsum').onclick=async function(){if(!ready())return;put('#o-sum2');
     $('#btrs').disabled=!n};
   const one=async(i,fresh)=>{const [a,b]=parts[i];slots[i].replaceChildren(skel(many?t('sumPartBusy',a,b):t('sumBusy')));
     try{const s=await api(`/api/files/${fid}/summary`,'POST',{from:a,to:b,fresh:!!fresh});if(S.fid!==fid)return;
-      done[i]=s.id;S.sid=s.id;put('#o-sum2');
+      done[i]=s.id;S.sid=s.id;put('#o-sum2');$('#btrs').disabled=false;   // a ready summary can be translated
       slots[i].replaceChildren(sumCard(s,many?t('sumTitle')+' · '+t('sumPart',a,b):t('sumTitle')),
         againBtn(t('newSum'),()=>one(i,true).then(()=>{if(many)showProg()})))}
     catch(x){if(S.fid!==fid)return;const rb=h('button',{class:'ghost',type:'button'},ic('refresh'),t('retry'));
