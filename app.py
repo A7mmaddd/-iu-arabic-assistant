@@ -302,7 +302,7 @@ def ask(fid):
     else:                                   # instructors can use the tutor too (same flow, not stored on a Student)
         mine = ChatMessage("student", q, rt)
         text = ai.answer(f, q, rt.thread() if rt else [])
-        if text.strip() == "NOT_RELATED": text = "This question is not related to your uploaded file, so I can't answer it."
+        if text.strip() == "NOT_RELATED": text = not_related_text(q)
         reply = ChatMessage("ai", text, mine)
     for m in (mine, reply): m.fileId = fid; MESSAGES[m.id] = m
     if not reply.text.startswith("[DEMO"):

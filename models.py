@@ -29,8 +29,7 @@ class Student(User):
         """Ask the AI tutor. replyTo = an earlier AI ChatMessage the student is replying to."""
         mine = ChatMessage("student", q, replyTo); self.messages.append(mine)
         text = ai.answer(f, q, replyTo.thread() if replyTo else [])
-        if text.strip() == "NOT_RELATED":
-            text = "This question is not related to your uploaded file, so I can't answer it."
+        if text.strip() == "NOT_RELATED": text = not_related_text(q)
         reply = ChatMessage("ai", text, mine); self.messages.append(reply)
         return reply
     def askByVoice(self, ai, f, audio, replyTo=None):
@@ -65,6 +64,12 @@ class Instructor(User):
     def printExam(self, exam, withAnswers=False): return exam.exportText(withAnswers)   # printed in the browser
     def copyExam(self, exam, withAnswers=False): return exam.exportText(withAnswers)
     def viewResults(self, exam): return [a for a in exam.attempts if a.submittedAt]
+
+def not_related_text(q):
+    """The tutor's reply to a question that has nothing to do with the file, in the question's language."""
+    if re.search(r"[؀-ۿ]", q or ""):
+        return "هذا السؤال لا يتعلق بالملف المرفوع، لذلك لا أستطيع الإجابة عنه. جرّب أن تسأل عن موضوع من مواضيع الملف."
+    return "This question is not related to your uploaded file, so I can't answer it. Try asking about a topic from the file."
 
 class ChatMessage:
     def __init__(self, role, text, replyTo=None):
