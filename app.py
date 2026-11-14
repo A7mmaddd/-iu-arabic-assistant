@@ -59,7 +59,8 @@ def locked(): return open_attempt(me())[0] is not None
 def index():
     html = open(os.path.join(app.static_folder, "index.html"), encoding="utf-8").read()
     base = request.host_url
-    tags = f'<link rel="canonical" href="{base}">\n<meta property="og:url" content="{base}">'
+    tags = (f'<link rel="canonical" href="{base}">\n<meta property="og:url" content="{base}">'
+            f'\n<meta property="og:image" content="{base}static/logo.png">')
     gsv = os.getenv("GOOGLE_SITE_VERIFICATION", "").strip()   # from Google Search Console -> "HTML tag"
     if gsv: tags += f'\n<meta name="google-site-verification" content="{gsv}">'
     return html.replace("<!--GSV-->", tags, 1), 200, {"Content-Type": "text/html; charset=utf-8"}
