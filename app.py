@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, session, send_from_directory
 from models import *
 from services import AuthService, LLMService, ProfileError
 from store import Store, file_hash
+from scan import Scanner
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__, static_folder="static")
@@ -12,6 +13,14 @@ app.secret_key = os.getenv("SECRET_KEY", "change-me")
 app.config.update(MAX_CONTENT_LENGTH=CourseFile.MAX, PERMANENT_SESSION_LIFETIME=timedelta(days=30),
                   SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=bool(os.getenv("RENDER")))
 auth, ai, db = AuthService(), LLMService(), Store()
+
+def scanned_pages_read(h, got):
+    """Scanned pages just read by the AI -> put their text into every open copy of that file."""
+    for f in list(FILES.values()):
+        if f.hash == h:
+            for n, t in got.items():
+                if 0 < n <= len(f.pages): f.pages[n - 1] = Page(n, t)
+scanner = Scanner(ai, db, scanned_pages_read)
 FILES, SUMMARIES, QUIZZES, EXAMS = {}, {}, {}, {}      # working copies in memory; files/summaries/chats are also in the DB
 PUBLISHED = {}                                         # join code -> published Exam
 MESSAGES = {}                                          # ChatMessage id -> ChatMessage (for replies)
@@ -145,10 +154,13 @@ def load_my_files(u):
     u._loaded = True
     for h, info in db.user_files(u.email):
         if file_id(u.email, h) in FILES: continue
-        texts = db.load_pages(h)
-        if texts is not None: add_file(u, h, info.get("name", "file"), texts)
+        j = scanner.job(h)
+        texts = j.texts if j else db.load_pages(h)
+        if texts is None: continue
+        if not j: scanner.register(h, info.get("name", "file"), "pdf", texts, db.file_info(h))
+        add_file(u, h, info.get("name", "file"), texts)
 
-def file_json(f): return dict(id=f.id, name=f.fileName, pages=len(f.pages))
+def file_json(f): return dict(id=f.id, name=f.fileName, pages=len(f.pages), scan=scanner.status(f.hash))
 
 @app.route("/api/files", methods=["GET", "POST"])
 def files():
@@ -162,17 +174,34 @@ def files():
     raw = up.read(); check = CourseFile(up.filename, len(raw), u.email)
     if not check.validate(): return err("Only PDF/PPT/PPTX up to 300 MB are accepted")
     h = file_hash(raw)
-    if file_id(u.email, h) in FILES: return jsonify(file_json(FILES[file_id(u.email, h)]))   # uploaded again
-    texts = db.load_pages(h)                         # someone already uploaded this exact file -> no need to read it
+    j = scanner.job(h)
+    if file_id(u.email, h) in FILES:                 # uploaded again: carry on reading scanned pages if it had stopped
+        if j and not j.running: scanner.start(h, j.name, check.fileType, raw, j.texts, db.file_info(h))
+        return jsonify(file_json(FILES[file_id(u.email, h)]))
+    texts = j.texts if j and j.running else db.load_pages(h)   # someone already uploaded this exact file
+    info = db.file_info(h) if texts is not None else {}
     if texts is None:
         check.raw = raw
         try: ai.processFile(check)
         except Exception as e: return err(f"Could not read the file: {e}")
         texts = [p.text for p in check.pages]
         db.save_pages(h, up.filename, check.fileType, texts)
+    if not (j and j.running): scanner.start(h, up.filename, check.fileType, raw, texts, info)   # scanned pages -> AI
     f = add_file(u, h, up.filename, texts)
     db.add_user_file(u.email, h, up.filename, len(texts))
     return jsonify(file_json(f))
+
+@app.get("/api/files/<fid>/scan")
+def scan_status(fid):
+    f = own(fid)
+    if not f: return err("Not found", 404)
+    return jsonify(scan=scanner.status(f.hash), pages=len(f.pages))
+
+def read_pages(f, frm, to, timeout=120):
+    """Before using pages: wait (up to timeout) for scanned pages in the range that are still being read.
+    Returns True when every page in the range has its text (so the result may be saved and shared)."""
+    scanner.wait(f.hash, frm, to, timeout)
+    return scanner.ready(f.hash, frm, to)
 
 @app.delete("/api/files/<fid>")
 def delete_file(fid):
@@ -206,6 +235,7 @@ def summary(fid):
     to = min(int(j.get("to", len(f.pages))), frm + MAX_SUMMARY_PAGES - 1, len(f.pages))
     key = f"{CACHE_V}-{ai._lang(f, frm, to)}-{frm}-{to}"
     fresh = bool(j.get("fresh"))                    # "New summary": ask the AI again, shown to this user only
+    whole = read_pages(f, frm, to)                  # scanned pages: wait for them; share only complete results
     hit = None if fresh else db.cached(f.hash, "summaries", key)   # same file + same pages before -> no AI call
     if hit:
         s = Summary(hit["bulletPoints"], hit["keyTerms"], frm, to, sections=hit["sections"], coverage=hit["coverage"])
@@ -216,10 +246,10 @@ def summary(fid):
             f.summaries.remove(s)
             return err("The AI is busy right now (Google servers or free-tier limit). Please try again in a minute.", 503)
         c = s.coverage
-        if not fresh and ai.client and not c.get("failedPages") and c.get("coveredPages"):   # only complete results are shared
+        if whole and not fresh and ai.client and not c.get("failedPages") and c.get("coveredPages"):   # only complete results are shared
             db.cache(f.hash, "summaries", key, dict(bulletPoints=s.bulletPoints, keyTerms=s.keyTerms,
                                                      sections=s.sections, coverage=c))
-    s.fileHash, s.cacheKey = (None, None) if fresh else (f.hash, key)   # a fresh summary's translation is not shared either
+    s.fileHash, s.cacheKey = (f.hash, key) if whole and not fresh else (None, None)   # a fresh summary's translation is not shared either
     SUMMARIES[s.id] = s
     return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections,
                    coverage=s.coverage, pageFrom=frm, pageTo=to, cached=bool(hit))
@@ -251,7 +281,8 @@ def tr_part(fid):
     j = request.json or {}
     frm, to = page_range(f, j)
     key = f"{CACHE_V}-pages-{frm}-{to}"
-    return jsonify(text=cached_text(f.hash, key, lambda: ai.translatePart(f, frm, to).translatedText,
+    whole = read_pages(f, frm, to)
+    return jsonify(text=cached_text(f.hash if whole else None, key, lambda: ai.translatePart(f, frm, to).translatedText,
                                     fresh=bool(j.get("fresh"))))
 
 @app.post("/api/files/<fid>/ask")
@@ -262,6 +293,7 @@ def ask(fid):
     if not f: return err("Not found", 404)
     j = request.json or {}; q = (j.get("q") or "").strip()
     if not q: return err("Write a question first.")
+    read_pages(f, 1, len(f.pages), timeout=60)      # tutor reads the whole file: give scanned pages a moment
     rt = MESSAGES.get(j.get("replyTo") or "")
     if rt and (rt.role != "ai" or getattr(rt, "fileId", None) != fid): rt = None   # only this user's chat for this file
     if isinstance(u, Student):
@@ -298,6 +330,7 @@ def quiz(fid):
     j = request.json or {}
     n = max(5, min(10, int(j.get("n", 5))))
     frm, to = page_range(f, j)
+    read_pages(f, frm, to)
     q = ai.generateQuiz(f, n, j.get("language"), frm, to); QUIZZES[q.id] = q
     return jsonify(id=q.id, questions=[dict(questionText=x.questionText, options=x.options) for x in q.questions])
 
@@ -326,6 +359,7 @@ def exam(fid):
     j = request.json or {}
     n = max(1, min(20, int(j.get("n", 5))))
     frm, to = page_range(f, j)
+    read_pages(f, frm, to)
     e = u.generateExam(ai, f, n, "Arabic" if j.get("language") == "Arabic" else "English", frm, to); EXAMS[e.id] = e
     return jsonify(exam_dict(e))
 

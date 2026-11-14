@@ -1,5 +1,5 @@
 """AuthService, AIService (interface), LLMService — as in the class diagram."""
-import io, json, os, threading, time
+import io, json, os, re, threading, time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from models import *
@@ -132,7 +132,8 @@ class LLMService(AIService):
         Returns (text, cut) where cut=True means the reply hit max_tokens and is incomplete."""
         from google.genai import types, errors
         contents = [types.Content(role="model" if m["role"] == "assistant" else "user",
-                                  parts=[types.Part(text=m["content"])]) for m in messages]
+                                  parts=m["content"] if isinstance(m["content"], list)     # e.g. a PDF + a prompt
+                                  else [types.Part(text=m["content"])]) for m in messages]
         def cfg(thinking):
             return types.GenerateContentConfig(
                 system_instruction=system, max_output_tokens=max_tokens,
@@ -199,6 +200,40 @@ class LLMService(AIService):
                      for sl in Presentation(io.BytesIO(f.raw)).slides]
         f.pages = [Page(i + 1, t) for i, t in enumerate(texts)]
         f.encrypt()
+
+    # ---- Scanned pages (pictures of text): Gemini reads the page image and writes out its text ----
+    SCAN_PROMPT = ("You are an OCR engine for Arabic and English course books. The attached PDF has {k} page(s). "
+                   "Write out ALL the text on every page exactly as printed: keep Arabic diacritics (tashkeel), "
+                   "Quran verses, hadith, poetry, headings, lists and footnotes; keep the reading order of the page. "
+                   "Do not translate, summarize, correct or explain anything. Before each page write a line "
+                   "=== PAGE n === where n is 1 to {k} in order. If a page has no text, write only its line.")
+    SCAN_TOKENS = 32_000
+
+    @staticmethod
+    def pdf_subset(raw, numbers):
+        """A small PDF holding only the given pages (1-based), to send to the AI."""
+        from pypdf import PdfReader, PdfWriter
+        r, w = PdfReader(io.BytesIO(raw)), PdfWriter()
+        for n in numbers: w.add_page(r.pages[n - 1])
+        out = io.BytesIO(); w.write(out); return out.getvalue()
+
+    def readScannedPages(self, raw, numbers):
+        """Read the text of scanned PDF pages. Returns {page number: text}.
+        Raises if the AI is busy or the reply was cut off (the caller retries / splits the batch)."""
+        from google.genai import types
+        data = self.pdf_subset(raw, numbers)
+        k = len(numbers)
+        text, cut = self._gen("You transcribe documents.",
+                              [{"role": "user", "content": [types.Part.from_bytes(data=data, mime_type="application/pdf"),
+                                                            types.Part(text=self.SCAN_PROMPT.format(k=k))]}],
+                              self.SCAN_TOKENS)
+        if cut: raise OverflowError("reply cut off")
+        out = {n: "" for n in numbers}
+        for m in re.finditer(r"=+\s*PAGE\s*(\d+)\s*=+\s*\n?(.*?)(?=\n?=+\s*PAGE\s*\d+\s*=+|\Z)", text, re.S):
+            i = int(m.group(1))
+            if 1 <= i <= k: out[numbers[i - 1]] = m.group(2).strip()
+        if k == 1 and not re.search(r"=+\s*PAGE", text): out[numbers[0]] = text.strip()
+        return out
 
     # ---- Summary: big files are split into parts, each part is summarized in detail, then all parts are merged ----
     PART_CHARS = 60_000      # about 15-30 pages of normal text per part

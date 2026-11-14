@@ -22,12 +22,18 @@
 |---|---|---|
 | AuthService | 11 | checkProfile (34), authenticateWithGoogle (63), signIn (79), validateSession (85) |
 | AIService (interface, ABC) | 87 | processFile (89), summarize (91), translatePart (93), translateSummary (95), answer (97), generateQuiz (99), generateExam (101), verifyQuestion (103) |
-| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 105 | processFile (192), summarize (241, splits big files into parts + coverage warning), translatePart (294), translateSummary (298), answer (303), generateQuiz (341), generateExam (347), verifyQuestion (360) |
+| LLMService (extends AIService) — uses Google Gemini (several models, a busy one is skipped) | 105 | processFile (193), readScannedPages (220, Gemini reads scanned PDF pages), summarize (276, splits big files into parts + coverage warning), translatePart (329), translateSummary (333), answer (338), generateQuiz (376), generateExam (382), verifyQuestion (395) |
 
 ## store.py
 | Class | Methods |
 |---|---|
-| Store (Firestore, memory fallback) | profile, save_profile, claim_id, load_pages, save_pages, user_files, add_user_file, remove_user_file, chat, add_chat, cached, cache |
+| Store (Firestore, memory fallback) | profile, save_profile, claim_id, load_pages, save_pages (+ scan progress), file_info, user_files, add_user_file, remove_user_file, chat, add_chat, cached, cache |
+
+## scan.py (scanned PDFs, read in the background)
+| Class | Line | Methods (line) |
+|---|---|---|
+| ScanJob (one file being read) | 21 | status (37), ready (42) |
+| Scanner | 47 | needs (53), register (62), start (70), prioritize (88), wait (95), ready (106) |
 
 ## static/index.html
 | Class | Where | Methods |

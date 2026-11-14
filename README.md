@@ -28,6 +28,13 @@ see results with the most-missed questions and how many times each student left 
 Note: the free plan sleeps after ~15 min idle (first visit takes ~1 min). With FIREBASE_CREDENTIALS set,
 profiles, files, summaries, translations and chats are kept in the database; quizzes and exams are still in memory.
 
+## Scanned PDFs (pages that are pictures)
+Pages with no real text are read by Gemini in the background (scan.py): upload finishes at once, a bar shows
+"reading pages: x of y", and the pages a user asks for are read first. Reading is 5 pages per request, 3 at a time;
+the text is saved to the database after every batch, so it is read only once (also for other users of the same file).
+If the server restarts in the middle, uploading the file again carries on from where it stopped. Pages the AI could
+not read after 3 tries are listed in the summary warning; uploading the file again tries them again.
+
 ## First login (profile)
 After Google sign-in, a new user fills a short form once: full name (required), university/staff number
 (required: 9 digits = student, 6 digits = instructor), university e-mail (optional: students @stu.iu.edu.sa,
