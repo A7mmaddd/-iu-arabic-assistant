@@ -420,7 +420,44 @@ class LLMService(AIService):
         qs = [ExamQuestion(x["questionText"], x["options"], x["correctAnswer"], x.get("explanation", ""),
                            evidencePage=self._page(x.get("page"), f))
               for x in self._mcqs(f, n, language, frm, to)][:n]
+        if language == "English": self.addArabic(qs)
         return Exam(qs, language, f.fileName, f)
+
+    # ---- English exams: an Arabic translation under each question, for the instructor only ----
+    def addArabic(self, qs):
+        """Translate English exam questions to Arabic (one AI call). Sets q.ar; leaves it None if the AI fails."""
+        if not qs: return
+        items = [{"question": q.questionText, "options": q.options} for q in qs]
+        d = self._json("Translate these English multiple-choice exam questions into clear Modern Standard Arabic for "
+                       "the course instructor, who will check that they understand each question. " + self.RULES +
+                       " Translate faithfully; keep numbers, names and technical terms accurate. Keep the same number "
+                       'and order of questions and options. Output: [{"question":"","options":[""]}]',
+                       json.dumps(items, ensure_ascii=False))
+        if not isinstance(d, list) or len(d) != len(qs): return
+        for q, x in zip(qs, d):
+            if isinstance(x, dict) and isinstance(x.get("options"), list) and len(x["options"]) == len(q.options):
+                q.ar = {"questionText": str(x.get("question") or ""), "options": [str(o) for o in x["options"]]}
+
+    def bilingualQuestion(self, text, options):
+        """An instructor's question for an ENGLISH exam; any field may be written in Arabic.
+        Returns (english text, english options, arabic translation dict or None).
+        Fields already in English are kept as written; on any AI problem the input comes back unchanged."""
+        d = self._json("You prepare one multiple-choice question for an exam written in English. The teacher may have "
+                       "written the question and/or some options in Arabic. " + self.RULES +
+                       ' Output: {"en":{"question":"","options":[""]},"ar":{"question":"","options":[""]}}.'
+                       " en = the English exam version: keep every field that is already in English exactly as written;"
+                       " translate fields written in Arabic into clear academic English (use the usual English or"
+                       " transliterated form of Arabic and Islamic terms). ar = a faithful Modern Standard Arabic"
+                       " translation of the en version, for the teacher. Keep the same number and order of options.",
+                       json.dumps({"question": text, "options": options}, ensure_ascii=False))
+        try:
+            en, ar = d["en"], d["ar"]
+            en_q, en_o = str(en["question"]).strip(), [str(o).strip() for o in en["options"]]
+            ar_q, ar_o = str(ar["question"]).strip(), [str(o).strip() for o in ar["options"]]
+            if not en_q or len(en_o) != len(options) or len(ar_o) != len(options) or not all(en_o): raise ValueError
+        except Exception:
+            return text, options, None
+        return en_q, en_o, {"questionText": ar_q, "options": ar_o}
 
     @staticmethod
     def _page(p, f):

@@ -119,7 +119,7 @@ aside.dragging::after{content:attr(data-drop);position:absolute;inset:8px;border
 .user .meta{min-width:0;flex:1;line-height:1.3}
 .user .meta b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .user .meta small{color:var(--mut);font-size:12px}
-.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tools{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .tools button{padding:8px 10px;font-size:13px}
 .upload{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;border:2px dashed var(--gold);
   border-radius:var(--r);padding:18px 12px;color:var(--brand-ink);font-weight:600;cursor:pointer;background:var(--soft);transition:.25s var(--ease)}
@@ -283,6 +283,22 @@ select{cursor:pointer}
 .vnote{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:10px 0 0;padding:8px 12px;border-radius:var(--r-sm);line-height:1.6}
 .vnote svg{margin-top:3px;width:16px;height:16px}
 .vnote.ok{background:var(--okbg);color:var(--ok)}.vnote.warn{background:var(--warnbg);color:var(--warn)}
+.artr{margin:10px 0 0;padding:9px 12px;border-radius:var(--r-sm);background:var(--panel2);border-inline-start:3px solid var(--gold);font-size:14px}
+.artr .lab{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut);margin-bottom:4px}.artr .lab svg{width:14px;height:14px}
+.artr ol{list-style:none;margin:4px 0 0;padding:0}.artr li{display:flex;gap:6px}.artr li b{color:var(--mut);font-weight:600}
+.tip{position:fixed;z-index:200;max-width:210px;padding:6px 10px;border-radius:9px;background:var(--brand);color:#fff;
+  font-size:12.5px;line-height:1.5;box-shadow:var(--sh2);pointer-events:none;opacity:0;transform:translateY(4px);
+  transition:opacity .25s var(--ease),transform .25s var(--ease)}
+[data-theme=dark] .tip{background:#1d7a60}
+.tip.in{opacity:1;transform:none}
+@media (max-width:700px){.tip{font-size:11.5px;max-width:150px;padding:4px 8px;line-height:1.4}}
+.tip::before{content:"";position:absolute;left:var(--ax,50%);top:-5px;width:10px;height:10px;margin-left:-5px;background:inherit;transform:rotate(45deg)}
+.tip.up::before{top:auto;bottom:-5px}
+.tipring{position:fixed;z-index:199;border:2px solid var(--gold);border-radius:10px;pointer-events:none;opacity:0;transition:opacity .25s}
+.tipring.in{opacity:1}
+.tipbar{position:fixed;z-index:201;inset-block-end:18px;left:50%;transform:translateX(-50%);padding:5px 12px;border-radius:99px;background:var(--panel);color:var(--ink);border:1px solid var(--gold);font-size:12.5px;box-shadow:var(--sh2);pointer-events:none;opacity:0;transition:opacity .25s}
+.tipbar.in{opacity:1}
+.arhint{font-size:12.5px;color:var(--mut);margin:6px 0 0}
 #scanbar{margin:0 0 10px}#scanbar .vnote{margin:0}#scanbar .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
 #scanbar .bar i{display:block;height:100%;background:var(--brand2);transition:width .4s var(--ease)}
 .eoedit{display:flex;gap:10px;align-items:center;margin:7px 0}
@@ -447,6 +463,7 @@ select{cursor:pointer}
   </div>
   <div class="tools">
     <button class="ghost js-theme" data-i18n-title="theme"></button>
+    <button class="ghost js-help" id="help" type="button" data-i18n-title="helpTitle"></button>
     <button class="ghost js-lang" data-i18n-title="language"></button>
   </div>
   <label class="upload" id="upzone"><svg class="i"><use href="#i-upload"/></svg><span id="upT" data-i18n="upload"></span><small data-i18n="uploadHint"></small>
@@ -570,7 +587,7 @@ en:{
  pubTitle:'Published exam',shareCode:'Share this code with your students',locked:'Published exams are locked and cannot be edited.',
  results:'Student results',refresh:'Refresh',noAttempts:'No student has taken this exam yet.',colName:'Name',colEmail:'Email',colScore:'Score',colTime:'Submitted',
  avg:(n,p)=>n+(n===1?' student':' students')+' · average '+p+'%',myExams:'My exams',draft:'Draft',open:'Open',attemptsN:n=>n+(n===1?' attempt':' attempts'),loading:'Loading…',
-uploaded:'File uploaded',scanRun:(d,n)=>'This file is scanned (pictures of pages). Reading the pages: '+d+' of '+n+'. You can start now; the pages you ask for are read first.',scanPaused:n=>n+' scanned page(s) are not read yet (the server restarted). Upload the file again to carry on from where it stopped.',scanFailed:n=>n+' scanned page(s) could not be read. Upload the file again to try them again.',scanDone:'All scanned pages are read.',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
+uploaded:'File uploaded',helpTitle:'How to use the website',tipNext:(i,n)=>i+' / '+n+'  ·  click anywhere for the next ones',help:'Guide',h_up:'Upload a PDF or PowerPoint file of your course',h_file:'Open this file to work on it',h_del:'Remove the file from your list',h_theme:'Switch dark / light mode',h_lang:'Change the website language',h_lo:'Sign out',h_menu:'Open your files',h_range:'Choose the pages to work on (from - to)',h_all:'Select all pages of the file',h_tsum:'Summaries of the pages',h_ttr:'Translate pages to English',h_ttu:'Ask the AI tutor about the file',h_tqz:'Practice quiz',h_tex:'Make an exam for your students',h_tte:'Take an exam with a code from your instructor',h_bsum:'Summarize the selected pages',h_btrs:'Translate the summary to English',h_again:'Ask the AI to make it again (only you see the new one)',h_copy:'Copy the text',h_btr:'Translate the selected pages',h_q:'Write your question about the file here',h_mic:'Ask by voice',h_ask:'Send the question',h_listen:'Listen to the answer',h_reply:'Reply to this answer (ask a follow-up)',h_qn:'How many questions',h_qlang:'Language of the questions',h_bqz:'Make a quiz from the selected pages',h_en:'How many questions',h_elang:'Language of the exam',h_bex:'Make exam questions from the selected pages',h_tools:'Print or copy the exam, with or without the answer key',h_pub:'Publish the exam and get a code for students',h_qsave:'Save your changes to this question',h_qdel:'Delete this question',h_addq:'Write your own question here',h_code:'Type the exam code from your instructor',h_join:'Start the exam',arTr:'Arabic translation (for you only; students do not see it)',arNone:'The Arabic translation is not available right now.',arHint:'You can write the question or the options in Arabic; they are translated to English when you save.',scanRun:(d,n)=>'This file is scanned (pictures of pages). Reading the pages: '+d+' of '+n+'. You can start now; the pages you ask for are read first.',scanPaused:n=>n+' scanned page(s) are not read yet (the server restarted). Upload the file again to carry on from where it stopped.',scanFailed:n=>n+' scanned page(s) could not be read. Upload the file again to try them again.',scanDone:'All scanned pages are read.',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
  sumPart:(a,b)=>'Pages '+a+'–'+b,sumPartBusy:(a,b)=>'Summarizing pages '+a+'–'+b+'…',sumProg:(d,n)=>'Summarized '+d+' of '+n+' parts',
  sumBatchInfo:n=>'Large ranges are summarized 15 pages at a time ('+n+' parts). Each part appears as soon as it is ready.',retry:'Try again',newSum:'New summary',newTr:'New translation',aiBusy:'The AI is busy right now (Google servers or the free limit). Please try again in a minute.',
  reading:n=>'Reading '+n+'…',badType:'Only PDF, PPT or PPTX files are accepted.',tooBig:'File is larger than 300 MB.',
@@ -619,7 +636,7 @@ ar:{
  pubTitle:'الامتحان منشور',shareCode:'شارك هذا الرمز مع طلابك',locked:'الامتحان المنشور مقفل ولا يمكن تعديله.',
  results:'نتائج الطلاب',refresh:'تحديث',noAttempts:'لم يحل أي طالب هذا الامتحان بعد.',colName:'الاسم',colEmail:'البريد',colScore:'الدرجة',colTime:'وقت التسليم',
  avg:(n,p)=>n+' طالب · المتوسط '+p+'%',myExams:'امتحاناتي',draft:'مسودة',open:'فتح',attemptsN:n=>n+' محاولة',loading:'جارٍ التحميل…',
-uploaded:'تم رفع الملف',scanRun:(d,n)=>'هذا الملف ممسوح ضوئيًا (صور صفحات). جارٍ قراءة الصفحات: '+d+' من '+n+'. تقدر تبدأ الآن، والصفحات اللي تطلبها تُقرأ أولًا.',scanPaused:n=>'لم تُقرأ '+n+' صفحة ممسوحة بعد (أُعيد تشغيل الخادم). ارفع الملف مرة ثانية ليكمل من حيث توقف.',scanFailed:n=>'تعذّرت قراءة '+n+' صفحة ممسوحة. ارفع الملف مرة ثانية لإعادة المحاولة.',scanDone:'تمت قراءة كل الصفحات الممسوحة.',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
+uploaded:'تم رفع الملف',helpTitle:'طريقة استخدام الموقع',tipNext:(i,n)=>i+' / '+n+'  ·  اضغط في أي مكان للتالي',help:'الشرح',h_up:'ارفع ملف المادة (PDF أو PowerPoint)',h_file:'افتح هذا الملف للعمل عليه',h_del:'احذف الملف من قائمتك',h_theme:'تبديل الوضع الليلي / النهاري',h_lang:'تغيير لغة الموقع',h_lo:'تسجيل الخروج',h_menu:'افتح قائمة ملفاتك',h_range:'اختر الصفحات اللي تشتغل عليها (من - إلى)',h_all:'اختيار كل صفحات الملف',h_tsum:'تلخيص الصفحات',h_ttr:'ترجمة الصفحات للإنجليزية',h_ttu:'اسأل المعلم الذكي عن الملف',h_tqz:'اختبار تدريبي',h_tex:'سوِّ امتحان لطلابك',h_tte:'ادخل امتحان بالرمز من أستاذك',h_bsum:'لخّص الصفحات المختارة',h_btrs:'ترجم الملخص للإنجليزية',h_again:'خلّ الذكاء الاصطناعي يسويه من جديد (الجديد يظهر لك بس)',h_copy:'انسخ النص',h_btr:'ترجم الصفحات المختارة',h_q:'اكتب سؤالك عن الملف هنا',h_mic:'اسأل بصوتك',h_ask:'أرسل السؤال',h_listen:'استمع للإجابة',h_reply:'رد على هذه الإجابة (سؤال متابعة)',h_qn:'عدد الأسئلة',h_qlang:'لغة الأسئلة',h_bqz:'سوِّ اختبار من الصفحات المختارة',h_en:'عدد الأسئلة',h_elang:'لغة الامتحان',h_bex:'ولّد أسئلة امتحان من الصفحات المختارة',h_tools:'اطبع أو انسخ الامتحان، مع مفتاح الإجابة أو بدونه',h_pub:'انشر الامتحان وخذ رمز للطلاب',h_qsave:'احفظ تعديلاتك على السؤال',h_qdel:'احذف هذا السؤال',h_addq:'اكتب سؤالك الخاص هنا',h_code:'اكتب رمز الامتحان من أستاذك',h_join:'ابدأ الامتحان',arTr:'الترجمة العربية (لك فقط، لا تظهر للطلاب)',arNone:'الترجمة العربية غير متاحة الآن.',arHint:'تقدر تكتب السؤال أو الاختيارات بالعربي، وتُترجم للإنجليزية تلقائيًا عند الحفظ.',scanRun:(d,n)=>'هذا الملف ممسوح ضوئيًا (صور صفحات). جارٍ قراءة الصفحات: '+d+' من '+n+'. تقدر تبدأ الآن، والصفحات اللي تطلبها تُقرأ أولًا.',scanPaused:n=>'لم تُقرأ '+n+' صفحة ممسوحة بعد (أُعيد تشغيل الخادم). ارفع الملف مرة ثانية ليكمل من حيث توقف.',scanFailed:n=>'تعذّرت قراءة '+n+' صفحة ممسوحة. ارفع الملف مرة ثانية لإعادة المحاولة.',scanDone:'تمت قراءة كل الصفحات الممسوحة.',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
  sumPart:(a,b)=>'الصفحات '+a+'–'+b,sumPartBusy:(a,b)=>'جارٍ تلخيص الصفحات '+a+'–'+b+'…',sumProg:(d,n)=>'تم تلخيص '+d+' من '+n+' أجزاء',
  sumBatchInfo:n=>'النطاقات الكبيرة تُلخّص كل 15 صفحة على حدة ('+n+' أجزاء). يظهر كل جزء فور جاهزيته.',retry:'إعادة المحاولة',newSum:'ملخص جديد',newTr:'ترجمة جديدة',aiBusy:'الذكاء الاصطناعي مشغول الآن (ضغط على خوادم Google أو انتهى الحد المجاني). حاول مرة أخرى بعد دقيقة.',
  reading:n=>'جارٍ قراءة '+n+'…',badType:'الملفات المقبولة: PDF أو PPT أو PPTX فقط.',tooBig:'حجم الملف أكبر من 300 ميغابايت.',
@@ -653,7 +670,7 @@ function toast(msg,type='info',ms){ms=ms||(type==='err'?5500:2600);
   const el=h('div',{class:'toast '+type,role:'status'},ic(type==='err'?'alert':type==='ok'?'check':'spark'),h('span',{},String(msg)));
   $('#toasts').append(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('in')));
   setTimeout(()=>{el.classList.remove('in');setTimeout(()=>el.remove(),300)},ms)}
-function copyBtn(getText){const b=h('button',{class:'ghost',type:'button'},ic('copy'),t('copy'));
+function copyBtn(getText){const b=h('button',{class:'ghost copyb',type:'button'},ic('copy'),t('copy'));
   b.onclick=async()=>{try{await navigator.clipboard.writeText(getText());toast(t('copied'),'ok')}catch{
     const ta=h('textarea',{style:'position:fixed;opacity:0'});ta.value=getText();document.body.append(ta);ta.select();
     try{document.execCommand('copy');toast(t('copied'),'ok')}catch{}ta.remove()}};return b}
@@ -676,6 +693,7 @@ function applyLang(){document.documentElement.lang=L;document.documentElement.di
   $$('[data-i18n-ph]').forEach(e=>e.placeholder=t(e.dataset.i18nPh));
   $$('[data-i18n-title]').forEach(e=>{const v=t(e.dataset.i18nTitle);e.title=v;e.setAttribute('aria-label',v)});
   $$('.js-lang').forEach(b=>b.replaceChildren(ic('globe'),h('span',{},L==='ar'?'EN':'عربي')));
+  $$('.js-help').forEach(b=>b.replaceChildren(ic('info'),h('span',{},t('help'))));
   $('#side').dataset.drop=t('dropHere');
   if(S.user)setWho();drawFiles();pick(S.fid);drawTutorEmpty();updatePc();
   drawExamList();
@@ -764,6 +782,66 @@ function drawScan(){const f=cur(),s=f&&f.scan,bar=$('#scanbar');
     h('span',{style:'flex:1'},t('scanRun',s.done,s.total),h('div',{class:'bar'},h('i',{style:`width:${Math.round(100*(s.done+s.failed)/Math.max(1,s.total))}%`})))));
   else put('#scanbar',h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
     h('span',{},s.paused?t('scanPaused',s.total-s.done-s.failed):t('scanFailed',s.failed))))}
+/* "How to use": small notes next to every visible button for 5 seconds (the open tab's buttons included) */
+// in the order a user works: upload and pick a file, set up the site, choose pages, the tabs, the open tab's buttons, sign out last
+const TIPS=[['#menu','h_menu'],['#upzone','h_up'],['#files .file','h_file'],['#files .fdel','h_del'],
+  ['.tools .js-lang','h_lang'],['.tools .js-theme','h_theme'],['#a','h_range'],['#all','h_all'],
+  ['#tabs [data-t=sum]','h_tsum'],['#tabs [data-t=tr]','h_ttr'],['#tabs [data-t=tu]','h_ttu'],['#tabs [data-t=qz]','h_tqz'],
+  ['#tabs [data-t=ex]','h_tex'],['#tabs [data-t=te]','h_tte'],
+  ['#bsum','h_bsum'],['#btrs','h_btrs'],['#btr','h_btr'],
+  ['#q','h_q'],['#bmic','h_mic'],['#bask','h_ask'],['#chat .acts button:first-child','h_listen'],['#chat .acts button:nth-child(2)','h_reply'],
+  ['#qn','h_qn'],['#qlang','h_qlang'],['#bqz','h_bqz'],
+  ['#en','h_en'],['#elang','h_elang'],['#bex','h_bex'],['#o-ex .exhead > button','h_pub'],['#o-ex .extools','h_tools'],
+  ['#o-ex .q:not(.addq) .row button:not(.danger)','h_qsave'],['#o-ex .q:not(.addq) .danger','h_qdel'],['#addq textarea','h_addq'],
+  ['#code','h_code'],['#bjoin','h_join'],
+  ['.panel:not(.hide) .again','h_again'],['.panel:not(.hide) .out .copyb','h_copy'],['#lo','h_lo']];
+/* Notes that would cover each other (or another highlighted button) are not shown together:
+   they are split into rounds; each round stays 5 seconds, a click anywhere goes to the next round. */
+let tipRounds=[],tipRound=-1,tipTimer=null,tipBar=null;
+const tipsOn=()=>tipRound>=0;
+const over=(a,b,pad)=>a.x<b.x+b.w+pad&&a.x+a.w+pad>b.x&&a.y<b.y+b.h+pad&&a.y+a.h+pad>b.y;
+function hideTips(){clearTimeout(tipTimer);const old=[...tipRounds.flat().flatMap(x=>[x.tip,x.ring]),...(tipBar?[tipBar]:[])];
+  tipRounds=[];tipRound=-1;tipBar=null;
+  old.forEach(e=>e.classList.remove('in'));setTimeout(()=>old.forEach(e=>e.parentNode&&e.parentNode.removeChild(e)),300)}
+function showRound(i){clearTimeout(tipTimer);
+  tipRounds.forEach((R,k)=>R.forEach(x=>{x.tip.classList.toggle('in',k===i);x.ring.classList.toggle('in',k===i)}));
+  tipRound=i;
+  if(tipBar){tipBar.textContent=t('tipNext',i+1,tipRounds.length);tipBar.classList.add('in')}
+  tipTimer=setTimeout(nextRound,5000)}
+function nextRound(){tipRound+1<tipRounds.length?showRound(tipRound+1):hideTips()}
+function showTips(){hideTips();const W=innerWidth,H=innerHeight,phone=W<=700,items=[];
+  for(const [sel,key] of TIPS){if(phone&&sel.startsWith('#tabs'))continue;   // small screen: the tabs already say what they are
+    const el=$$(sel).find(x=>{const r=x.getBoundingClientRect();
+      return r.width>0&&r.height>0&&r.bottom>0&&r.top<H&&r.right>0&&r.left<W&&!x.closest('.hide')});
+    if(!el)continue;const r=el.getBoundingClientRect();
+    const tip=h('div',{class:'tip',role:'tooltip',dir:'auto'},t(key)),ring=h('div',{class:'tipring'});
+    Object.assign(ring.style,{left:r.left-3+'px',top:r.top-3+'px',width:r.width+6+'px',height:r.height+6+'px'});
+    document.body.append(ring,tip);
+    const w=tip.offsetWidth,th=tip.offsetHeight,x=Math.min(Math.max(8,r.left+r.width/2-w/2),W-w-8);
+    const box={x:r.left-3,y:r.top-3,w:r.width+6,h:r.height+6};
+    const below={x,y:r.bottom+9,w,h:th,up:false},above={x,y:r.top-th-9,w,h:th,up:true};
+    const fits=c=>c.y>=4&&c.y+c.h<=H-4;
+    const cands=[below,above].filter(fits);if(!cands.length)cands.push(below);
+    items.push({tip,ring,r,box,cands})}
+  // keep the order: add notes to the current round; a note that would cover another note or another
+  // highlighted button starts the next round (so the rounds follow the steps one after another)
+  for(const it of items){const R=tipRounds[tipRounds.length-1];
+    const c=R&&it.cands.find(c=>!R.some(o=>over(c,o.pos,4)||over(c,o.box,2)||over(o.pos,it.box,2)));
+    if(c){it.pos=c;R.push(it)}else{it.pos=it.cands[0];tipRounds.push([it])}}
+  for(const it of tipRounds.flat()){const {tip,pos,r}=it;
+    tip.classList.toggle('up',pos.up);tip.style.left=pos.x+'px';tip.style.top=pos.y+'px';
+    tip.style.setProperty('--ax',Math.min(pos.w-12,Math.max(12,r.left+r.width/2-pos.x))+'px')}
+  if(!tipRounds.length)return;
+  if(tipRounds.length>1){tipBar=h('div',{class:'tipbar',dir:'auto'});document.body.append(tipBar)}
+  requestAnimationFrame(()=>requestAnimationFrame(()=>showRound(0)))}
+$('#help').onclick=e=>{e.stopPropagation();if(tipsOn())return hideTips();
+  const open=document.querySelector('.drawer');if(open)closeDrawer();      // phone: close the files menu first
+  setTimeout(showTips,open?320:0)};
+addEventListener('pointerdown',e=>{if(tipsOn()&&!e.target.closest('#help')){e.preventDefault();e.stopPropagation();nextRound()}},true);
+addEventListener('click',e=>{if(tipsOn()&&!e.target.closest('#help')){e.preventDefault();e.stopPropagation()}},true);
+addEventListener('keydown',e=>{if(tipsOn()&&e.key==='Escape')hideTips()});
+addEventListener('scroll',()=>{if(tipsOn())hideTips()},true);
+addEventListener('resize',()=>{if(tipsOn())hideTips()});
 let scanTimer=null;
 function watchScan(){clearTimeout(scanTimer);const f=cur();drawScan();
   if(!f||!f.scan||!f.scan.running)return;
@@ -815,7 +893,7 @@ function sumNote(c){if(!c||c.totalPages==null||c.demo)return '';
   return h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
     h('span',{},h('b',{},t('sumWarnTitle')),...lines.map(x=>h('div',{},x))))}
 // "New summary" / "New translation": the AI makes it again for this user (the saved copy stays for others)
-function againBtn(label,fn){const b=h('button',{class:'ghost',type:'button'},ic('refresh'),label);
+function againBtn(label,fn){const b=h('button',{class:'ghost again',type:'button'},ic('refresh'),label);
   b.onclick=()=>{b.disabled=true;fn()};return h('div',{class:'row',style:'margin-top:8px'},b)}
 const SUM_MAX=15,SUM_PAR=3;   // 15 pages per request (same limit as the server); 3 parts at the same time
 function sumCard(s,title){const pts=[].concat(s.bulletPoints||[]);
@@ -1055,11 +1133,17 @@ function optionEditor(name,options,correct,onchange){const box=h('div',{});
     const ck=rows.find(r=>r.querySelector('input[type=radio]').checked);
     return{options:opts.filter(Boolean),correctAnswer:ck?ck.querySelector('input[type=text]').value.trim():''}};
   return box}
+/* English exams: Arabic translation under each question (instructor only) */
+const enExam=()=>S.exam&&S.exam.language==='English';
+function arBox(q){if(!enExam())return '';
+  if(!q.ar)return h('div',{class:'artr',dir:'auto'},h('div',{class:'lab'},ic('globe'),t('arNone')));
+  return h('div',{class:'artr',dir:'rtl',lang:'ar'},h('div',{class:'lab'},ic('globe'),t('arTr')),
+    h('div',{},q.ar.questionText),h('ol',{},...q.ar.options.map((o,k)=>h('li',{},h('b',{},'أبجدهو'[k]+')'),h('span',{},o)))))}
 function examCard(q,i,locked){
   const delay=`animation-delay:${Math.min(i,8)*40}ms`;
   if(locked){const opts=h('div',{class:'eopts'},...q.options.map((o,k)=>h('div',{class:'eo'+(o===q.correctAnswer?' ok':''),dir:exDir()},
       h('span',{class:'k'},o===q.correctAnswer?ic('check'):(LET[k]||k+1)),h('span',{},o))));
-    return h('div',{class:'q',style:delay},qBadges(q,i),h('div',{class:'ro',dir:exDir()},q.questionText),opts,verifyLine(q))}
+    return h('div',{class:'q',style:delay},qBadges(q,i),h('div',{class:'ro',dir:exDir()},q.questionText),opts,arBox(q),verifyLine(q))}
   const card=h('div',{class:'q',style:delay});
   const ta=h('textarea',{rows:'3',dir:exDir(),'aria-label':t('qText')+' '+(i+1)});ta.value=q.questionText;
   const save=h('button',{class:'ghost',type:'button',disabled:true},ic('save'),h('span',{},t('saveEdit')));
@@ -1078,7 +1162,8 @@ function examCard(q,i,locked){
   del.onclick=async()=>{$$('#o-ex button').forEach(b=>b.disabled=true);
     try{await api(`/api/exams/${S.exam.id}/questions/${i}`,'DELETE');S.exam.questions.splice(i,1);drawExam();loadExams();toast(t('deleted'),'ok')}
     catch(x){toast(x,'err');drawExam()}};
-  card.append(qBadges(q,i),ta,h('span',{class:'lbl'},t('markCorrect')),ed,verifyLine(q),h('div',{class:'row',style:'margin-top:12px'},save,del));
+  card.append(qBadges(q,i),ta,h('span',{class:'lbl'},t('markCorrect')),ed,arBox(q),
+    enExam()?h('p',{class:'arhint',dir:'auto'},t('arHint')):'',verifyLine(q),h('div',{class:'row',style:'margin-top:12px'},save,del));
   return card}
 /* Add Own Question «include» Verify Answer Exists in Course File */
 function addQuestionCard(){const card=h('div',{class:'q addq',id:'addq'});
@@ -1094,7 +1179,8 @@ function addQuestionCard(){const card=h('div',{class:'q addq',id:'addq'});
       S.exam.questions.push(r);drawExam();loadExams();toast(r.isVerified?t('added'):t('addedWarn'),r.isVerified?'ok':'err');
       $('#addq')?.previousElementSibling?.scrollIntoView({behavior:'smooth',block:'center'})}
     catch(x){toast(x,'err');go.disabled=false;go.replaceChildren(ic('plus'),h('span',{},t('bAddQ')))}};
-  card.append(h('h4',{},t('addQ')),h('p',{class:'mut',style:'margin:0 0 8px;font-size:13.5px'},t('addQHint')),ta,
+  card.append(h('h4',{},t('addQ')),h('p',{class:'mut',style:'margin:0 0 8px;font-size:13.5px'},t('addQHint')),
+    enExam()?h('p',{class:'arhint',dir:'auto',style:'margin:0 0 8px'},t('arHint')):'',ta,
     h('span',{class:'lbl'},t('markCorrect')),ed,ex,h('div',{class:'row',style:'margin-top:12px'},go));
   return card}
 
