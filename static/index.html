@@ -569,7 +569,7 @@ en:{
  avg:(n,p)=>n+(n===1?' student':' students')+' · average '+p+'%',myExams:'My exams',draft:'Draft',open:'Open',attemptsN:n=>n+(n===1?' attempt':' attempts'),loading:'Loading…',
 uploaded:'File uploaded',delFile:'Delete file',delAsk:n=>'Delete "'+n+'"? Its summaries will be deleted too. This cannot be undone.',deleted:'File deleted',
  sumPart:(a,b)=>'Pages '+a+'–'+b,sumPartBusy:(a,b)=>'Summarizing pages '+a+'–'+b+'…',sumProg:(d,n)=>'Summarized '+d+' of '+n+' parts',
- sumBatchInfo:n=>'Large ranges are summarized 15 pages at a time ('+n+' parts). Each part appears as soon as it is ready.',retry:'Try again',aiBusy:'The AI is busy right now (Google servers or the free limit). Please try again in a minute.',
+ sumBatchInfo:n=>'Large ranges are summarized 15 pages at a time ('+n+' parts). Each part appears as soon as it is ready.',retry:'Try again',newSum:'New summary',newTr:'New translation',aiBusy:'The AI is busy right now (Google servers or the free limit). Please try again in a minute.',
  reading:n=>'Reading '+n+'…',badType:'Only PDF, PPT or PPTX files are accepted.',tooBig:'File is larger than 300 MB.',
  netErr:'Cannot reach the server. Check your connection and try again (the server may take up to a minute to wake up).',
  srvErr:'Server error. Please try again.',generic:'Something went wrong'},
@@ -618,7 +618,7 @@ ar:{
  avg:(n,p)=>n+' طالب · المتوسط '+p+'%',myExams:'امتحاناتي',draft:'مسودة',open:'فتح',attemptsN:n=>n+' محاولة',loading:'جارٍ التحميل…',
 uploaded:'تم رفع الملف',delFile:'حذف الملف',delAsk:n=>'حذف "'+n+'"؟ سيتم حذف ملخصاته أيضًا، ولا يمكن التراجع.',deleted:'تم حذف الملف',
  sumPart:(a,b)=>'الصفحات '+a+'–'+b,sumPartBusy:(a,b)=>'جارٍ تلخيص الصفحات '+a+'–'+b+'…',sumProg:(d,n)=>'تم تلخيص '+d+' من '+n+' أجزاء',
- sumBatchInfo:n=>'النطاقات الكبيرة تُلخّص كل 15 صفحة على حدة ('+n+' أجزاء). يظهر كل جزء فور جاهزيته.',retry:'إعادة المحاولة',aiBusy:'الذكاء الاصطناعي مشغول الآن (ضغط على خوادم Google أو انتهى الحد المجاني). حاول مرة أخرى بعد دقيقة.',
+ sumBatchInfo:n=>'النطاقات الكبيرة تُلخّص كل 15 صفحة على حدة ('+n+' أجزاء). يظهر كل جزء فور جاهزيته.',retry:'إعادة المحاولة',newSum:'ملخص جديد',newTr:'ترجمة جديدة',aiBusy:'الذكاء الاصطناعي مشغول الآن (ضغط على خوادم Google أو انتهى الحد المجاني). حاول مرة أخرى بعد دقيقة.',
  reading:n=>'جارٍ قراءة '+n+'…',badType:'الملفات المقبولة: PDF أو PPT أو PPTX فقط.',tooBig:'حجم الملف أكبر من 300 ميغابايت.',
  netErr:'تعذّر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى (قد يحتاج الخادم دقيقة حتى يستيقظ).',
  srvErr:'خطأ في الخادم. حاول مرة أخرى.',generic:'حدث خطأ ما'}
@@ -797,6 +797,9 @@ function sumNote(c){if(!c||c.totalPages==null||c.demo)return '';
     if(c.tooDense)lines.push(t('sumDense'));if(c.note)lines.push(c.note)}
   return h('div',{class:'vnote warn',dir:'auto'},ic('alert'),
     h('span',{},h('b',{},t('sumWarnTitle')),...lines.map(x=>h('div',{},x))))}
+// "New summary" / "New translation": the AI makes it again for this user (the saved copy stays for others)
+function againBtn(label,fn){const b=h('button',{class:'ghost',type:'button'},ic('refresh'),label);
+  b.onclick=()=>{b.disabled=true;fn()};return h('div',{class:'row',style:'margin-top:8px'},b)}
 const SUM_MAX=15,SUM_PAR=3;   // 15 pages per request (same limit as the server); 3 parts at the same time
 function sumCard(s,title){const pts=[].concat(s.bulletPoints||[]);
   const secs=(s.sections&&s.sections.length)?s.sections:[{title:'',points:pts}];
@@ -814,23 +817,29 @@ $('#bsum').onclick=async function(){if(!ready())return;put('#o-sum2');
   put('#o-sum',...(many?[h('p',{class:'hint',dir:'auto'},t('sumBatchInfo',parts.length)),prog]:[]),...slots);
   const showProg=()=>{const n=done.filter(Boolean).length;prog.textContent=t('sumProg',n,parts.length);
     $('#btrs').disabled=!n};
-  const one=async i=>{const [a,b]=parts[i];slots[i].replaceChildren(skel(many?t('sumPartBusy',a,b):t('sumBusy')));
-    try{const s=await api(`/api/files/${fid}/summary`,'POST',{from:a,to:b});if(S.fid!==fid)return;
-      done[i]=s.id;S.sid=s.id;slots[i].replaceChildren(sumCard(s,many?t('sumTitle')+' · '+t('sumPart',a,b):t('sumTitle')))}
+  const one=async(i,fresh)=>{const [a,b]=parts[i];slots[i].replaceChildren(skel(many?t('sumPartBusy',a,b):t('sumBusy')));
+    try{const s=await api(`/api/files/${fid}/summary`,'POST',{from:a,to:b,fresh:!!fresh});if(S.fid!==fid)return;
+      done[i]=s.id;S.sid=s.id;put('#o-sum2');
+      slots[i].replaceChildren(sumCard(s,many?t('sumTitle')+' · '+t('sumPart',a,b):t('sumTitle')),
+        againBtn(t('newSum'),()=>one(i,true).then(()=>{if(many)showProg()})))}
     catch(x){if(S.fid!==fid)return;const rb=h('button',{class:'ghost',type:'button'},ic('refresh'),t('retry'));
       rb.onclick=()=>{rb.disabled=true;one(i).then(showProg)};
       slots[i].replaceChildren(h('div',{},fail((many?t('sumPart',a,b)+': ':'')+(String(x).startsWith('The AI is busy')?t('aiBusy'):x)),h('div',{class:'row',style:'margin-top:8px'},rb)))}};
   btn.disabled=true;if(many)showProg();
   let next=0;const worker=async()=>{while(next<parts.length&&S.fid===fid){await one(next++);if(many)showProg()}};
   try{await Promise.all(Array.from({length:Math.min(SUM_PAR,parts.length)},worker))}finally{btn.disabled=false}};
-$('#btrs').onclick=function(){const ids=(S.sids||[]).filter(Boolean);if(!ids.length)return;
+function trSummaries(btn,fresh){const ids=(S.sids||[]).filter(Boolean);if(!ids.length)return;
   run('#o-sum2',t('trsBusy'),async()=>{const out=[];
-    for(const id of ids){const r=await api(`/api/summaries/${id}/translate`,'POST');out.push(r.text)}
+    for(const id of ids){const r=await api(`/api/summaries/${id}/translate`,'POST',{fresh:!!fresh});out.push(r.text)}
     const txt=out.join('\n\n');
-    put('#o-sum2',card(t('sumTrTitle'),rich(txt),txt));$('#o-sum2').scrollIntoView({behavior:'smooth',block:'nearest'})},this)};
-$('#btr').onclick=function(){if(!ready())return;
-  run('#o-tr',t('trBusy'),async()=>{const r=await api(`/api/files/${S.fid}/translate`,'POST',rng());
-    put('#o-tr',card(t('trTitle'),h('div',{class:'plain'},r.text),r.text))},this)};
+    put('#o-sum2',card(t('sumTrTitle'),rich(txt),txt),againBtn(t('newTr'),()=>trSummaries(btn,true)));
+    $('#o-sum2').scrollIntoView({behavior:'smooth',block:'nearest'})},btn)}
+$('#btrs').onclick=function(){trSummaries(this,false)};
+function trPages(btn,range,fresh){const fid=S.fid;
+  run('#o-tr',t('trBusy'),async()=>{const r=await api(`/api/files/${fid}/translate`,'POST',{...range,fresh:!!fresh});
+    if(S.fid!==fid)return;
+    put('#o-tr',card(t('trTitle'),h('div',{class:'plain'},r.text),r.text),againBtn(t('newTr'),()=>trPages(btn,range,true)))},btn)}
+$('#btr').onclick=function(){if(!ready())return;trPages(this,rng(),false)};
 
 /* ---------- SpeechService (class diagram «Service»): uses the free Web Speech API built into the browser ---------- */
 const SpeechService={

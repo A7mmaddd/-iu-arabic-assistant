@@ -205,7 +205,8 @@ def summary(fid):
     frm = max(1, int(j.get("from", 1)))
     to = min(int(j.get("to", len(f.pages))), frm + MAX_SUMMARY_PAGES - 1, len(f.pages))
     key = f"{CACHE_V}-{ai._lang(f, frm, to)}-{frm}-{to}"
-    hit = db.cached(f.hash, "summaries", key)       # same file + same pages summarized before -> no AI call
+    fresh = bool(j.get("fresh"))                    # "New summary": ask the AI again, shown to this user only
+    hit = None if fresh else db.cached(f.hash, "summaries", key)   # same file + same pages before -> no AI call
     if hit:
         s = Summary(hit["bulletPoints"], hit["keyTerms"], frm, to, sections=hit["sections"], coverage=hit["coverage"])
         f.summaries.append(s)
@@ -215,16 +216,18 @@ def summary(fid):
             f.summaries.remove(s)
             return err("The AI is busy right now (Google servers or free-tier limit). Please try again in a minute.", 503)
         c = s.coverage
-        if ai.client and not c.get("failedPages") and c.get("coveredPages"):     # only complete results are shared
+        if not fresh and ai.client and not c.get("failedPages") and c.get("coveredPages"):   # only complete results are shared
             db.cache(f.hash, "summaries", key, dict(bulletPoints=s.bulletPoints, keyTerms=s.keyTerms,
                                                      sections=s.sections, coverage=c))
-    s.fileHash, s.cacheKey = f.hash, key
+    s.fileHash, s.cacheKey = (None, None) if fresh else (f.hash, key)   # a fresh summary's translation is not shared either
     SUMMARIES[s.id] = s
     return jsonify(id=s.id, bulletPoints=s.bulletPoints, keyTerms=s.keyTerms, sections=s.sections,
                    coverage=s.coverage, pageFrom=frm, pageTo=to, cached=bool(hit))
 
-def cached_text(h, key, make):
-    """Translation saved in the database by file hash; made by the AI only the first time."""
+def cached_text(h, key, make, fresh=False):
+    """Translation saved in the database by file hash; made by the AI only the first time.
+    fresh=True ("New translation"): ask the AI again and show it to this user only; the saved one stays."""
+    if fresh: return make()
     hit = db.cached(h, "translations", key) if h else None
     if hit: return hit["text"]
     text = make()
@@ -237,16 +240,19 @@ def tr_summary(sid):
     s = SUMMARIES.get(sid)
     if not s: return err("Not found", 404)
     key = f"summary-{getattr(s, 'cacheKey', s.id)}"
-    return jsonify(text=cached_text(getattr(s, "fileHash", None), key, lambda: ai.translateSummary(s).translatedText))
+    return jsonify(text=cached_text(getattr(s, "fileHash", None), key, lambda: ai.translateSummary(s).translatedText,
+                                fresh=bool((request.get_json(silent=True) or {}).get("fresh"))))
 
 @app.post("/api/files/<fid>/translate")
 def tr_part(fid):
     if locked(): return err(EXAM_LOCK, 423)
     f = own(fid)
     if not f: return err("Not found", 404)
-    frm, to = page_range(f, request.json or {})
+    j = request.json or {}
+    frm, to = page_range(f, j)
     key = f"{CACHE_V}-pages-{frm}-{to}"
-    return jsonify(text=cached_text(f.hash, key, lambda: ai.translatePart(f, frm, to).translatedText))
+    return jsonify(text=cached_text(f.hash, key, lambda: ai.translatePart(f, frm, to).translatedText,
+                                    fresh=bool(j.get("fresh"))))
 
 @app.post("/api/files/<fid>/ask")
 def ask(fid):
