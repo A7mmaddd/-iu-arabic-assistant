@@ -172,7 +172,9 @@ class Exam:
     def startAttempt(self, student):
         """Opens the student's single attempt (exam mode starts). Returns the open or finished attempt."""
         a = self.attemptOf(student.email)
-        if not a: a = ExamAttempt(student.name, student.email); self.attempts.append(a)
+        if not a:
+            a = ExamAttempt(student.name, student.email, universityId=getattr(student, "universityId", ""))
+            self.attempts.append(a)
         return a
     def submitAttempt(self, student, answers):
         a = self.startAttempt(student)
@@ -206,8 +208,9 @@ class Exam:
         return "\n".join(out).rstrip() + "\n"
 
 class ExamAttempt:
-    def __init__(self, studentName, email, answers=None, score=0, total=0):
+    def __init__(self, studentName, email, answers=None, score=0, total=0, universityId=""):
         self.studentName, self.email, self.answers = studentName, email, answers or []
+        self.universityId = universityId         # the student's registered university number (shown to the instructor)
         self.score, self.total = score, total
         self.submittedAt = None                  # None while the exam is still open (exam mode)
         self.tabLeaveCount = 0
@@ -215,6 +218,6 @@ class ExamAttempt:
         if not self.submittedAt: self.tabLeaveCount += 1
         return self.tabLeaveCount
     def to_dict(self):
-        return dict(name=self.studentName, email=self.email, score=self.score, total=self.total,
+        return dict(name=self.studentName, universityId=self.universityId, score=self.score, total=self.total,
                     tabLeaves=self.tabLeaveCount,
                     submittedAt=self.submittedAt.strftime("%Y-%m-%d %H:%M") if self.submittedAt else None)
