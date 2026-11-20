@@ -275,8 +275,9 @@ class LLMService(AIService):
 
     def summarize(self, f, frm, to):
         pages = [p for p in f.pages if frm <= p.pageNumber <= to]
-        readable = [p for p in pages if len(p.text.strip()) >= self.MIN_PAGE_CHARS]
-        emptyPages = [p.pageNumber for p in pages if p not in readable]
+        readable = [p for p in pages if len(p.text.strip()) >= self.MIN_PAGE_CHARS
+                    and len(re.findall(r"\.{4,}\s*\d+", p.text)) < 3]      # skip table-of-contents pages ("title ..... 7")
+        emptyPages = [p.pageNumber for p in pages if len(p.text.strip()) < self.MIN_PAGE_CHARS]
         failedPages, dense, note = [], False, ""
         lang = self._lang(f, frm, to)
 

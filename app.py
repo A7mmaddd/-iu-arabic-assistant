@@ -24,7 +24,7 @@ scanner = Scanner(ai, db, scanned_pages_read)
 FILES, SUMMARIES, QUIZZES, EXAMS = {}, {}, {}, {}      # working copies in memory; files/summaries/chats are also in the DB
 PUBLISHED = {}                                         # join code -> published Exam
 MESSAGES = {}                                          # ChatMessage id -> ChatMessage (for replies)
-CACHE_V = "v2"   # change this when the summary/translation prompts change, so old saved results are not reused
+CACHE_V = "v3"   # change this when the summary/translation prompts change, so old saved results are not reused
 
 def me():
     if auth.clientId and not session.get("google"): return None   # a demo-login session is not accepted once Google is on
